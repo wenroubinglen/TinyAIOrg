@@ -4,7 +4,7 @@ import {useState, useCallback, useEffect, Suspense} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePolling } from "@/lib/hooks";
 import { getAgents, createPybAgent, savePybAgent, deletePybAgent, checkDaemonHealth, type AgentConfig } from "@/lib/api";
-import { notifyRosterChanged } from "@/lib/roster-events";
+import { notifyRosterChanged, ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,17 @@ function AgentsPage() {
     if (searchParams.get("new") === "1") openNew();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  // roster 直听——teammate 经工具建/删 agent 时（SSE roster_changed）本页
+  // 立即刷新；单次加载（usePolling 0）无轮询兜底，不接事件则永不更新。
+  useEffect(() => {
+    const onRosterChanged = (e: Event) => {
+      const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
+      if (kind === "agents" || kind === "all" || !kind) refresh();
+    };
+    window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+    return () => window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+  }, [refresh]);
 
   const openEdit = (id: string, agent: AgentConfig) => {
     setEditing({ id, name: agent.name, description: "" });

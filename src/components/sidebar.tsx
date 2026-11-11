@@ -319,11 +319,14 @@ export function Sidebar() {
   useEffect(() => {
     const onRosterChanged = (e: Event) => {
       const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
-      if (kind === "teams" || !kind) refreshTeams();
-      if (kind === "agents" || !kind) refreshAgents();
-      // 组织变更经 roster 事件桥到 AI_ORG_CHANGED_EVENT
-      // ——sidebar/画布页既有监听统一重拉 loadAiOrgFromEngine（收敛点不变）
-      if (kind === "orgs") window.dispatchEvent(new Event(AI_ORG_CHANGED_EVENT));
+      if (kind === "teams" || kind === "all" || !kind) refreshTeams();
+      if (kind === "agents" || kind === "all" || !kind) refreshAgents();
+      // 组织变更经 roster 事件桥到 AI_ORG_CHANGED_EVENT——sidebar/画布页
+      // 既有监听统一重拉 loadAiOrgFromEngine（收敛点不变）。all/缺省兜底
+      // 同转译：跨 scope 变更（如建 org 连带管理者 agent）不漏刷新。
+      if (kind === "orgs" || kind === "all" || !kind) {
+        window.dispatchEvent(new Event(AI_ORG_CHANGED_EVENT));
+      }
     };
     window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
     return () => window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);

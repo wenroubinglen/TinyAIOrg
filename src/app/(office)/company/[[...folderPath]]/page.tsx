@@ -43,6 +43,7 @@ import {
 } from "@/lib/ai-org-engine";
 import { AI_ORG_CHANGED_EVENT, SIDEBAR_FLOAT_CLOSE_EVENT, ROSTER_DRAWER_OPEN_EVENT } from "@/components/sidebar";
 import { SSE_RECONNECTED_EVENT } from "@/lib/live-events";
+import { ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
 import { useConnectionPhase } from "@/lib/connection-phase";
 import {
   Bot,
@@ -1355,11 +1356,23 @@ function OrgChartInner() {
     const onChanged = () => void refreshAiOrg();
     window.addEventListener(AI_ORG_CHANGED_EVENT, onChanged);
     window.addEventListener(SSE_RECONNECTED_EVENT, onChanged);
+    // roster 直听（按 scope 分派三路刷新）——不依赖 sidebar 转译存活：
+    // teammate 经工具创建/删除 agent/team 时引擎推 roster_changed，若只
+    // 转译链可达会因 agents/teams 无转译而永不刷新（三数据源单次加载无
+    // 轮询兜底）。all/缺省兜底全刷，防跨 scope 变更漏刷。
+    const onRosterChanged = (e: Event) => {
+      const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
+      if (kind === "agents" || kind === "all" || !kind) refreshAgents();
+      if (kind === "teams" || kind === "all" || !kind) refreshTeams();
+      if (kind === "orgs" || kind === "all" || !kind) refreshAiOrg();
+    };
+    window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
     return () => {
       window.removeEventListener(AI_ORG_CHANGED_EVENT, onChanged);
       window.removeEventListener(SSE_RECONNECTED_EVENT, onChanged);
+      window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
     };
-  }, [refreshAiOrg]);
+  }, [refreshAiOrg, refreshAgents, refreshTeams]);
 
   // 路由路径 → 目标 folder——org_id 直查优先（每段
   // decodeURIComponent 后按 id 精确命中），slug 名字段仅作旧 URL 兼容
