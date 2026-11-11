@@ -6,6 +6,8 @@ import { useSearchParams } from "next/navigation";
 import { usePolling } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import { getAgents, type AgentConfig } from "@/lib/api";
+import { ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
+import { SSE_RECONNECTED_EVENT } from "@/lib/live-events";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 // 五快照组件脱挂保留（暂不可达，组件文件仍在 @/components/agent/ 待命）
@@ -82,6 +84,23 @@ function AgentConfigPage({ params }: { params: Promise<{ id: string }> }) {
       setCardFlipped(true);
     }
   }, [openCardEdit]);
+
+  // roster/SSE 直听——teammate 经工具建/删实体时本页数据即时刷新；单次
+  // 加载无兜底，不接事件则实体被删后停留僵尸页（下方「未找到」兜底永不
+  // 触发）。all/缺省兜底全刷（删 agent 走 all 语义）。
+  useEffect(() => {
+    const onRosterChanged = (e: Event) => {
+      const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
+      if (kind === "agents" || kind === "all" || !kind) refreshAgents();
+    };
+    const onReconnected = () => refreshAgents();
+    window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+    window.addEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    return () => {
+      window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+      window.removeEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    };
+  }, [refreshAgents]);
 
   const agent = agents?.[agentId];
 

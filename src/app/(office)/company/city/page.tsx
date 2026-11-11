@@ -1064,7 +1064,7 @@ export default function CityPage() {
   useEffect(() => {
     const onRefresh = (e: Event) => {
       const kind = (e as CustomEvent).detail?.kind;
-      if (kind === "agents" || kind === "orgs") {
+      if (kind === "agents" || kind === "orgs" || kind === "teams" || kind === "all" || !kind) {
         refreshAgents();
         refreshOrg();
         refreshTeams();

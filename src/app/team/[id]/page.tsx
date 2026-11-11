@@ -3,6 +3,8 @@
 import {use, useState, useCallback, useEffect, useRef, Suspense} from "react";
 import { useSearchParams } from "next/navigation";
 import { usePolling } from "@/lib/hooks";
+import { ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
+import { SSE_RECONNECTED_EVENT } from "@/lib/live-events";
 import { getAgents, getTeams, savePybTeam, type AgentConfig, type TeamConfig } from "@/lib/api";
 import { ChatRoomView } from "@/components/chatroom-view";
 import { GroupAvatar } from "@/components/team/group-avatar";
@@ -18,9 +20,30 @@ function TeamChatPage({
 }) {
   const { id } = use(params);
   const searchParams = useSearchParams();
-  const { data: agents } = usePolling<Record<string, AgentConfig>>(getAgents, 0);
+  const { data: agents, refresh: refreshAgents } = usePolling<Record<string, AgentConfig>>(getAgents, 0);
   const { data: teams, refresh: refreshTeams } = usePolling<Record<string, TeamConfig>>(getTeams, 0);
   const team = teams?.[id];
+
+  // roster/SSE 直听——teammate 经工具建/删实体时本页数据即时刷新（成员册
+  // 与群数据两源都刷）；单次加载无兜底，不接事件则实体变更后停留旧数据。
+  // 删 agent 走 all 语义——all/缺省兜底全刷。
+  useEffect(() => {
+    const onRosterChanged = (e: Event) => {
+      const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
+      if (kind === "teams" || kind === "all" || !kind) refreshTeams();
+      if (kind === "agents" || kind === "all" || !kind) refreshAgents();
+    };
+    const onReconnected = () => {
+      refreshTeams();
+      refreshAgents();
+    };
+    window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+    window.addEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    return () => {
+      window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+      window.removeEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    };
+  }, [refreshTeams, refreshAgents]);
 
   // 群编辑抽屉（对齐成员页身份卡模式：默认随页打开，用户自行关闭）
   const [drawerOpen, setDrawerOpen] = useState(true);
