@@ -25,7 +25,7 @@ pyb daemon start   # 启动常驻引擎（默认 127.0.0.1:3779）
 ## 启动
 
 ```bash
-git clone <repo-url> && cd tinyorg
+git clone https://github.com/wenroubinglen/TinyOrg.git && cd TinyOrg
 bun install        # 或 npm install
 bun run dev        # 或 npm run dev → http://localhost:3000
 ```
