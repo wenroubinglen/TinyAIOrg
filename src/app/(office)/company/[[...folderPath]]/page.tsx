@@ -1353,7 +1353,12 @@ function OrgChartInner() {
     void migrateLegacyAiOrgIfNeeded().catch(() => {
       /* 迁移失败不阻塞加载 */
     });
-    const onChanged = () => void refreshAiOrg();
+    const onChanged = () => {
+      // snapshot 语义：重连即全量重拉三路（SSE 无重放，断线期变更靠此补齐）
+      refreshAiOrg();
+      refreshAgents();
+      refreshTeams();
+    };
     window.addEventListener(AI_ORG_CHANGED_EVENT, onChanged);
     window.addEventListener(SSE_RECONNECTED_EVENT, onChanged);
     // roster 直听（按 scope 分派三路刷新）——不依赖 sidebar 转译存活：

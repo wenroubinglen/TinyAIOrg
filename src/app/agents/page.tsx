@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { usePolling } from "@/lib/hooks";
 import { getAgents, createPybAgent, savePybAgent, deletePybAgent, checkDaemonHealth, type AgentConfig } from "@/lib/api";
 import { notifyRosterChanged, ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
+import { SSE_RECONNECTED_EVENT } from "@/lib/live-events";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,13 +64,19 @@ function AgentsPage() {
 
   // roster 直听——teammate 经工具建/删 agent 时（SSE roster_changed）本页
   // 立即刷新；单次加载（usePolling 0）无轮询兜底，不接事件则永不更新。
+  // SSE 重连同挂：snapshot 语义，断线期变更重连后全量补齐。
   useEffect(() => {
     const onRosterChanged = (e: Event) => {
       const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
       if (kind === "agents" || kind === "all" || !kind) refresh();
     };
+    const onReconnected = () => refresh();
     window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
-    return () => window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+    window.addEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    return () => {
+      window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+      window.removeEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    };
   }, [refresh]);
 
   const openEdit = (id: string, agent: AgentConfig) => {

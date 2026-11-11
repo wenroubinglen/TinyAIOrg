@@ -10,6 +10,7 @@ import {
   type AgentConfig, type TeamConfig,
 } from "@/lib/api";
 import { notifyRosterChanged, ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
+import { SSE_RECONNECTED_EVENT } from "@/lib/live-events";
 import {
   ReactFlow,
   type Node,
@@ -193,14 +194,23 @@ function TeamsPage() {
   // roster 直听——teammate 经工具建/删 team/agent 时（SSE roster_changed）
   // 本页立即刷新；单次加载（usePolling 0）无轮询兜底，不接事件则永不更新。
   // agents 数据源同页消费（未分配区）——agents/all scope 一并刷。
+  // SSE 重连同挂：snapshot 语义，断线期变更重连后全量补齐。
   useEffect(() => {
     const onRosterChanged = (e: Event) => {
       const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
       if (kind === "teams" || kind === "all" || !kind) refresh();
       if (kind === "agents" || kind === "all" || !kind) refreshAgents();
     };
+    const onReconnected = () => {
+      refresh();
+      refreshAgents();
+    };
     window.addEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
-    return () => window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+    window.addEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    return () => {
+      window.removeEventListener(ROSTER_CHANGED_EVENT, onRosterChanged);
+      window.removeEventListener(SSE_RECONNECTED_EVENT, onReconnected);
+    };
   }, [refresh, refreshAgents]);
 
   // 侧栏「添加 Team」入口：?new=1 直开新建表单；?edit=<id> 直开编辑
