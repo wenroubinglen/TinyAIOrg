@@ -16,7 +16,7 @@
 **TinyAIOrg** 项目通过多层级组织树方式实现无限嵌套多智能体通信的AI项目——我相信不管未来有没有AGI，每个人背后可以是无数组织的组合，这不应该是大公司独一无二的密码，用来做研发，组织管理，以及任何需要大量智能体协助的复杂场景。
 
 <p align="center">
-  <a href="#演示">演示</a> · <a href="#功能">功能</a> · <a href="#前置要求">前置要求</a> · <a href="#启动">启动</a> · <a href="#开发">开发</a> · <a href="#技术栈">技术栈</a>
+  <a href="#演示">演示</a> · <a href="#功能">功能</a> · <a href="#注意事项">注意事项</a> · <a href="#前置要求">前置要求</a> · <a href="#启动">启动</a> · <a href="#开发">开发</a> · <a href="#技术栈">技术栈</a>
 </p>
 
 ---
@@ -63,17 +63,25 @@
 
 ---
 
+## 注意事项
+
+> ⚠️ **当前仅支持 Windows 系统**，Linux 与 macOS 将在后续版本支持。
+
+---
+
 ## 前置要求
 
-- Node.js ≥ 20（本仓开发用 bun 管理依赖亦可）
-- 本机已安装并配置 pyb 引擎（npm 包名 `pybao-xc-sdk`）：
+- Node.js ≥ 20.18.1（本仓开发用 bun 管理依赖亦可）
+- 本机已安装并配置 pyb 引擎（npm 包名 `pybao-xc-sdk`，无需单独安装 daemon 组件）：
 
 ```bash
 npm install -g pybao-xc-sdk
-pyb daemon start   # 启动常驻引擎
+pyb daemon start   # 启动常驻引擎（已在运行则为 no-op）
 ```
 
-> 模型供应商与 API Key 无需在此步配置——启动 TinyAIOrg 后在「设置 → 模型」页完成配置。
+> - Windows 用户建议在**管理员权限终端**执行安装，避免 PowerShell 执行策略 / EPERM 权限报错。
+> - `pyb daemon start` 会在当前终端启动常驻引擎，**保持该终端开启**；新开终端可用 `pyb daemon status` 随时确认存活（`pyb daemon stop` 停止）。
+> - 模型供应商与 API Key 无需在此步配置——启动 TinyAIOrg 后在「设置 → 模型」页完成配置。
 
 ## 启动
 
@@ -83,7 +91,7 @@ bun install        # 或 npm install
 bun run dev        # 或 npm run dev → http://localhost:3000
 ```
 
-确保 daemon 在跑（已在上一步启动；`pyb daemon status` 可随时查看状态，`pyb daemon stop` 停止）。
+打开 http://localhost:3000 后，若页面提示连接失败，先回终端执行 `pyb daemon status` 确认引擎存活，再刷新页面。
 
 ### 连接自定义端口
 

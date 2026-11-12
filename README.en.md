@@ -16,7 +16,7 @@
 **TinyAIOrg** is an AI project that enables infinitely nestable multi-agent communication through a multi-level organization tree. I believe that with or without AGI in the future, everyone deserves an army of organizations behind them — this should not be the exclusive privilege of big corporations. Use it for R&D, organization management, and any complex scenario that requires massive agent collaboration.
 
 <p align="center">
-  <a href="#demos">Demos</a> · <a href="#features">Features</a> · <a href="#prerequisites">Prerequisites</a> · <a href="#getting-started">Getting Started</a> · <a href="#development">Development</a> · <a href="#tech-stack">Tech Stack</a>
+  <a href="#demos">Demos</a> · <a href="#features">Features</a> · <a href="#notes">Notes</a> · <a href="#prerequisites">Prerequisites</a> · <a href="#getting-started">Getting Started</a> · <a href="#development">Development</a> · <a href="#tech-stack">Tech Stack</a>
 </p>
 
 ---
@@ -63,17 +63,25 @@
 
 ---
 
+## Notes
+
+> ⚠️ **Currently only Windows is supported.** Linux and macOS support will arrive in future releases.
+
+---
+
 ## Prerequisites
 
-- Node.js ≥ 20 (bun is also fine for managing dependencies)
-- The pyb engine installed locally (npm package `pybao-xc-sdk`):
+- Node.js ≥ 20.18.1 (bun is also fine for managing dependencies)
+- The pyb engine installed locally (npm package `pybao-xc-sdk`; no separate daemon components needed):
 
 ```bash
 npm install -g pybao-xc-sdk
-pyb daemon start   # start the resident engine
+pyb daemon start   # start the resident engine (no-op if already running)
 ```
 
-> No need to configure model providers or API keys in this step — after TinyAIOrg starts, finish the setup in "Settings → Models".
+> - Windows users are advised to install from an **administrator terminal** to avoid PowerShell execution-policy / EPERM errors.
+> - `pyb daemon start` launches the resident engine in the current terminal — **keep that terminal open**; run `pyb daemon status` in another terminal to check it at any time (`pyb daemon stop` stops it).
+> - No need to configure model providers or API keys in this step — after TinyAIOrg starts, finish the setup in "Settings → Models".
 
 ## Getting Started
 
@@ -83,7 +91,7 @@ bun install        # or npm install
 bun run dev        # or npm run dev → http://localhost:3000
 ```
 
-Make sure the daemon is running (started in the previous step; `pyb daemon status` checks the state at any time, `pyb daemon stop` stops it).
+After opening http://localhost:3000, if the page reports a connection failure, run `pyb daemon status` in your terminal to confirm the engine is alive, then refresh.
 
 ### Connecting to a Custom Port
 

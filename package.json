@@ -6,7 +6,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wenroubinglen/TinyOrg.git"
+    "url": "git+https://github.com/wenroubinglen/TinyAIOrg.git"
   },
   "scripts": {
     "dev": "next dev --webpack",
