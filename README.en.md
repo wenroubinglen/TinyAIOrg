@@ -13,7 +13,7 @@
 
 </div>
 
-**TinyAIOrg** is an AI project built on a self-developed multi-agent collaboration and communication architecture. It uses a multi-level organization tree to enable infinitely nestable multi-agent communication — bringing your AI teammates, teams, and organizations into a single page: org charts, a 3D sky city, all operable directly in the browser, with all data staying on your machine. I believe that with or without AGI in the future, everyone deserves an army of organizations behind them — this should not be the exclusive privilege of big corporations. Use it for R&D, organization management, and any complex scenario that requires massive agent collaboration.
+**TinyAIOrg** is an AI project that enables infinitely nestable multi-agent communication through a multi-level organization tree. I believe that with or without AGI in the future, everyone deserves an army of organizations behind them — this should not be the exclusive privilege of big corporations. Use it for R&D, organization management, and any complex scenario that requires massive agent collaboration.
 
 <p align="center">
   <a href="#demos">Demos</a> · <a href="#features">Features</a> · <a href="#prerequisites">Prerequisites</a> · <a href="#getting-started">Getting Started</a> · <a href="#development">Development</a> · <a href="#tech-stack">Tech Stack</a>
@@ -54,7 +54,7 @@
 
 ```bash
 npm install -g pybao-xc-sdk
-pyb daemon start   # start the resident engine (defaults to 127.0.0.1:3779)
+pyb daemon start   # start the resident engine
 ```
 
 > No need to configure model providers or API keys in this step — after TinyAIOrg starts, finish the setup in "Settings → Models".
