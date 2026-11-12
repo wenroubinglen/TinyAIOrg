@@ -23,15 +23,15 @@
 
 ## Demos
 
-**Global Search & Focus** — the search box dispatches per world; typing instantly locates the target member on canvas or in the city:
+**Quickly Create Members, Teams & Organizations** — right-click the canvas to create, or simply ask a member to create; quickly focus on whoever you want to give instructions to:
 
-<img src="public/1.gif" alt="Global search & focus demo" width="960">
+<img src="public/1.gif" alt="Quickly create members, teams and organizations" width="960">
 
-**Drawer Conversations** — session drawers pop in place across org/team/member views without leaving the page:
+**Build Infinitely Nestable, Deeply Complex Org Structures** — drawer-style conversations with orgs/teams/members; organizations can nest endlessly, no matter how complex the structure:
 
-<img src="public/2.gif" alt="Drawer conversations demo" width="960">
+<img src="public/2.gif" alt="Build infinitely nestable organization structures" width="960">
 
-**3D Sky City** — a visual world of your org tree and teammates; click a building to jump into the member's conversation:
+**3D Sky City** — a visual world of your org tree and teammates; click a teammate or an organization to jump straight into member and team conversations:
 
 <img src="public/3.gif" alt="3D Sky City demo" width="960">
 
@@ -39,10 +39,10 @@
 
 ## Features
 
-- **Company / 3D Sky City**: visualization of org structures and teammates — click a member to jump straight into their conversation
 - **Teammates (Agents)**: create/edit AI teammates, identity cards, skill panels, scheduled tasks, snapshot area
 - **Teams**: team chat rooms, member management, team-level scheduled tasks
-- **Organizations (Orgs)**: multi-level org trees, team mounting, command rooms
+- **Organizations (Orgs)**: infinitely nestable org trees
+- **3D Sky City**: visualization of org structures and teammates — click a member to jump straight into their conversation
 - **Settings**: model configuration, web search
 
 ---
@@ -57,7 +57,7 @@ npm install -g pybao-xc-sdk
 pyb daemon start   # start the resident engine (defaults to 127.0.0.1:3779)
 ```
 
-> No need to configure model providers or API keys in this step — after TinyAIOrg starts, finish the setup in "Settings → Models" (10 built-in provider templates + custom OpenAI/Anthropic-compatible endpoints, with online connectivity testing).
+> No need to configure model providers or API keys in this step — after TinyAIOrg starts, finish the setup in "Settings → Models".
 
 ## Getting Started
 
@@ -67,7 +67,7 @@ bun install        # or npm install
 bun run dev        # or npm run dev → http://localhost:3000
 ```
 
-The UI connects to `http://127.0.0.1:3779` by default (the pyb daemon's default port). Make sure the daemon is running (started in the previous step; `pyb daemon status` checks the state at any time, `pyb daemon stop` stops it).
+Make sure the daemon is running (started in the previous step; `pyb daemon status` checks the state at any time, `pyb daemon stop` stops it).
 
 ### Connecting to a Custom Port
 
