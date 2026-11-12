@@ -35,6 +35,22 @@
 
 <img src="public/3.gif" alt="3D Sky City demo" width="960">
 
+### Interface Preview
+
+<table>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <img src="public/4.png" width="100%" alt="TinyAIOrg interface preview 1">
+    </td>
+    <td width="33%" align="center" valign="top">
+      <img src="public/5.png" width="100%" alt="TinyAIOrg interface preview 2">
+    </td>
+    <td width="33%" align="center" valign="top">
+      <img src="public/6.png" width="100%" alt="TinyAIOrg interface preview 3">
+    </td>
+  </tr>
+</table>
+
 ---
 
 ## Features

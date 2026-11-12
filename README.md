@@ -35,6 +35,22 @@
 
 <img src="public/3.gif" alt="3D 天空之城可视化演示" width="960">
 
+### 界面预览
+
+<table>
+  <tr>
+    <td width="33%" align="center" valign="top">
+      <img src="public/4.png" width="100%" alt="TinyAIOrg 界面预览 1">
+    </td>
+    <td width="33%" align="center" valign="top">
+      <img src="public/5.png" width="100%" alt="TinyAIOrg 界面预览 2">
+    </td>
+    <td width="33%" align="center" valign="top">
+      <img src="public/6.png" width="100%" alt="TinyAIOrg 界面预览 3">
+    </td>
+  </tr>
+</table>
+
 ---
 
 ## 功能
