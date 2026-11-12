@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { usePolling, timeAgo } from "@/lib/hooks";
 import { CHAT_MESSAGE_EVENT, SSE_RECONNECTED_EVENT } from "@/lib/live-events";
-import { ROSTER_DRAWER_OPEN_EVENT } from "@/components/sidebar";
+import { ROSTER_DRAWER_OPEN_EVENT } from "@/lib/drawer-events";
 import {
   getAgents, getTeams, getPybTeamMessages, sendPybTeamMessage,
   type ChatMessage, type AgentConfig, type TeamConfig, type AttachmentRef,

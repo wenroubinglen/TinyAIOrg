@@ -41,9 +41,11 @@ export const AI_ORG_CHANGED_EVENT = "pyb-desktop:ai-org-changed";
 /** 画布化改造：画布空白点击 → 通知侧栏浮层收起（page.tsx onPaneClick 派发）。 */
 export const SIDEBAR_FLOAT_CLOSE_EVENT = "pyb-desktop:sidebar-float-close";
 
-/** 画布化改造：第二页行点击 → 画布右侧聊天抽屉打开（detail={kind:"agent"|"team", id}）。 */
-export const ROSTER_DRAWER_OPEN_EVENT = "pyb-desktop:roster-drawer-open";
-const DRAWER_INTENT_KEY = "pyb-desktop_open_drawer";
+/** 画布化改造：第二页行点击 → 画布右侧聊天抽屉打开（detail={kind:"agent"|"team", id}）。
+ *  常量本体迁 lib/drawer-events（与 AgentDrawer 互引破环）——消费方直接从
+ *  lib/drawer-events 导入；re-export 形态在 webpack 运行时抛
+ *  ReferenceError（真机 2026-11-12 坐实），不再转口。 */
+import { ROSTER_DRAWER_OPEN_EVENT, AGENT_DRAWER_ACTIVE_EVENT, DRAWER_INTENT_KEY } from "@/lib/drawer-events";
 
 const FOLDER_INDENT_CAP = 3;
 /** 组织树最大层级（AI 组织根不计；第 3 层行不再显示 + 号——层级封顶） */
@@ -296,8 +298,21 @@ export function Sidebar() {
       window.removeEventListener(ROSTER_CHANGED_EVENT, onBadge);
     };
   }, [refreshBadges]);
-  // 当前打开的会话豁免徽标（正看着）——pathname 变化即重算（豁免项过滤）
-  const activeAgentId = pathname.startsWith("/agents/") ? pathname.slice("/agents/".length) : "";
+  // 当前打开的会话豁免徽标（正看着）。
+  // /agents/[id] 路由已删——成员豁免源改为 AgentDrawer 打开态广播
+  // （AGENT_DRAWER_ACTIVE_EVENT，画布/city 双宿主同源派发）；team 豁免
+  // 仍走 /team/ 路径（群路由页未删）。
+  const [drawerAgentId, setDrawerAgentId] = useState<string | null>(null);
+  useEffect(() => {
+    const onDrawerActive = (e: Event) => {
+      setDrawerAgentId(
+        (e as CustomEvent<{ agentId?: string | null }>).detail?.agentId ?? null,
+      );
+    };
+    window.addEventListener(AGENT_DRAWER_ACTIVE_EVENT, onDrawerActive);
+    return () => window.removeEventListener(AGENT_DRAWER_ACTIVE_EVENT, onDrawerActive);
+  }, []);
+  const activeAgentId = drawerAgentId ?? "";
   const activeTeamId = pathname.startsWith("/team/") ? pathname.slice("/team/".length) : "";
 
   // 进会话即上报读游标（服务端记 last_read_ts，
@@ -849,8 +864,8 @@ export function Sidebar() {
                       const entry = agentEntries.find(([id]) => id === pid);
                       if (!entry) return null;
                       const [id, agent] = entry;
-                      const href = `/agents/${id}`;
-                      const active = pathname === href;
+                      // 行高亮改抽屉打开态（/agents/[id] 已删）
+                      const active = activeAgentId === id;
                       return (
                         <div
                           key={id}
@@ -911,8 +926,8 @@ export function Sidebar() {
                   totalCount={unpinnedVisible.length}
                   itemContent={(index) => {
                   const [id, agent] = unpinnedVisible[index];
-                const href = `/agents/${id}`;
-                const active = pathname === href;
+                // 行高亮改抽屉打开态（/agents/[id] 已删）
+                const active = activeAgentId === id;
                 return (
                   <div
                     key={id}
@@ -1334,6 +1349,8 @@ function GlobalSearchBar({
   folderHref: (id: string) => string;
   floating?: boolean;
 }) {
+  // 搜索按世界分发需要当前路由（画布/3D 就地聚焦，其他路由跳转兜底）
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -1391,7 +1408,8 @@ function GlobalSearchBar({
     }
     for (const [id, a] of Object.entries(agents ?? {})) {
       if (a && typeof a.name === "string" && a.name.toLowerCase().includes(query)) {
-        out.push({ kind: "agent", id, name: a.name, sub: "队友", href: `/agents/${id}` });
+        // /agents/[id] 已删——agent 项经 sessionStorage 意图开画布抽屉（go 内处理）
+        out.push({ kind: "agent", id, name: a.name, sub: "队友", href: "/company" });
       }
     }
     return out.slice(0, 12);
@@ -1400,11 +1418,32 @@ function GlobalSearchBar({
   useEffect(() => { setCursor(0); }, [q]);
 
   const go = useCallback((item: Item) => {
-    router.push(item.href);
+    // 按世界分发（搜索聚焦语义）：两世界各自「镜头聚焦+就地开抽屉」；
+    // 其他路由维持意图/跳转兜底。
+    const inCity = pathname === "/company/city";
+    const inCanvas = pathname.startsWith("/company");
+    if (inCity || inCanvas) {
+      // 两页都已监听 ROSTER_DRAWER_OPEN_EVENT（city：三类聚焦+开抽屉；
+      // 画布：抽屉+镜头聚焦）。kind 对齐：agent→agent / team→team / folder→orgRoom。
+      const kind = item.kind === "folder" ? "orgRoom" : item.kind;
+      window.dispatchEvent(
+        new CustomEvent(ROSTER_DRAWER_OPEN_EVENT, { detail: { kind, id: item.id } }),
+      );
+    } else if (item.kind === "agent") {
+      // 非画布路由：写意图跳画布开抽屉（AgentDrawer 组件监听消费）
+      try {
+        window.sessionStorage.setItem("pyb-desktop_open_drawer", JSON.stringify({ kind: "agent", id: item.id }));
+      } catch { /* 静默 */ }
+      router.push("/company");
+    } else if (item.kind === "team") {
+      router.push(`/company?focusTeam=${item.id}`);
+    } else {
+      router.push(item.href);
+    }
     setOpen(false);
     setQ("");
     inputRef.current?.blur();
-  }, [router]);
+  }, [router, pathname]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") { e.preventDefault(); setCursor(c => Math.min(c + 1, items.length - 1)); }
