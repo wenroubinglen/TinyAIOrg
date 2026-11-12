@@ -123,6 +123,16 @@ If this project helps you, please consider giving it a ⭐ Star so more people c
 
 ---
 
+## Contact
+
+📧 **Email**: [993226090@qq.com](mailto:993226090@qq.com)
+
+💬 **WeChat**: wenroubingleng
+
+For questions, bug reports, or collaboration inquiries, feel free to reach out via email or WeChat, or open an [Issue](https://github.com/wenroubinglen/TinyAIOrg/issues).
+
+---
+
 ## License
 
 [MIT](./LICENSE)

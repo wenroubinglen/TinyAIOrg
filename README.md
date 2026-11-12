@@ -123,6 +123,16 @@ bun run lint    # eslint
 
 ---
 
+## 联系方式
+
+📧 **联系邮箱**：[993226090@qq.com](mailto:993226090@qq.com)
+
+💬 **微信号**：wenroubingleng
+
+使用过程中有问题、想反馈 Bug 或洽谈合作，欢迎发邮件或加微信联系，也可以直接提 [Issues](https://github.com/wenroubinglen/TinyAIOrg/issues)。
+
+---
+
 ## License
 
 [MIT](./LICENSE)
