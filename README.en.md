@@ -23,18 +23,6 @@
 
 ## Demos
 
-**Quickly Create Members, Teams & Organizations** — right-click the canvas to create, or simply ask a member to create; quickly focus on whoever you want to give instructions to:
-
-<img src="public/1.gif" alt="Quickly create members, teams and organizations" width="960">
-
-**Build Infinitely Nestable, Deeply Complex Org Structures** — drawer-style conversations with orgs/teams/members; organizations can nest endlessly, no matter how complex the structure:
-
-<img src="public/2.gif" alt="Build infinitely nestable organization structures" width="960">
-
-**3D Sky City** — a visual world of your org tree and teammates; click a teammate or an organization to jump straight into member and team conversations:
-
-<img src="public/3.gif" alt="3D Sky City demo" width="960">
-
 ### Interface Preview
 
 <table>
@@ -50,6 +38,18 @@
     </td>
   </tr>
 </table>
+
+**Quickly Create Members, Teams & Organizations** — right-click the canvas to create, or simply ask a member to create; quickly focus on whoever you want to give instructions to:
+
+<img src="public/1.gif" alt="Quickly create members, teams and organizations" width="960">
+
+**Build Infinitely Nestable, Deeply Complex Org Structures** — drawer-style conversations with orgs/teams/members; organizations can nest endlessly, no matter how complex the structure:
+
+<img src="public/2.gif" alt="Build infinitely nestable organization structures" width="960">
+
+**3D Sky City** — a visual world of your org tree and teammates; click a teammate or an organization to jump straight into member and team conversations:
+
+<img src="public/3.gif" alt="3D Sky City demo" width="960">
 
 ---
 
