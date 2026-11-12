@@ -272,7 +272,7 @@ export function SchedulePane({
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold flex items-center gap-2">
             <CalendarDays className="h-4 w-4 text-primary" />
-            定时任务
+            任务
             {tasks && tasks.length > 0 && (
               <Badge variant="secondary" className="text-[10px]">
                 {tasks.length}
@@ -309,7 +309,7 @@ export function SchedulePane({
         ) : activeTasks.length === 0 && terminalTasks.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <CalendarDays className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">还没有定时任务。</p>
+            <p className="text-sm text-muted-foreground">还没有任务。</p>
             <p className="text-xs text-muted-foreground mt-2">
               {recipient.kind === "agent"
                 ? "点上方「新建任务」四段表单直建（循环/一次性/延时+起止窗）；或在聊天里说「每天 9 点提醒我…」让它自己 CronCreate；技能面板 ⏰ 可挂技能循环。"

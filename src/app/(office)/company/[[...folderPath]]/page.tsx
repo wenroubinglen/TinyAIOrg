@@ -41,7 +41,8 @@ import {
   engineMoveTeamToFolder,
   engineAssignAgentToOrg,
 } from "@/lib/ai-org-engine";
-import { AI_ORG_CHANGED_EVENT, SIDEBAR_FLOAT_CLOSE_EVENT, ROSTER_DRAWER_OPEN_EVENT } from "@/components/sidebar";
+import { AI_ORG_CHANGED_EVENT, SIDEBAR_FLOAT_CLOSE_EVENT } from "@/components/sidebar";
+import { ROSTER_DRAWER_OPEN_EVENT } from "@/lib/drawer-events";
 import { SSE_RECONNECTED_EVENT } from "@/lib/live-events";
 import { ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
 import { useConnectionPhase } from "@/lib/connection-phase";
@@ -66,10 +67,9 @@ import {
   MessageSquare,ChevronLeft} from "lucide-react";
 import { agentColor } from "@/components/sidebar";
 import { AgentAvatar, fallbackColorHex } from "@/components/agent/agent-avatar";
-import { IdentityCard } from "@/components/agent/identity-card";
+import { AgentDrawer, type AgentDrawerHandle } from "@/components/agent/agent-drawer";
 // 单聊/群抽屉右栏 schedule 段载体
 import { SchedulePane } from "@/components/agent/schedule-pane";
-import { TeammateChat } from "@/components/agent/teammate-chat";
 import { CmdRoomDrawer } from "@/components/cmdroom-drawer";
 import { ChatRoomView } from "@/components/chatroom-view";
 import { TeamEditor, type TeamFormData } from "@/components/team-editor";
@@ -1300,10 +1300,9 @@ function OrgChartInner() {
         cameraFnRef.current.exit();
         return;
       }
-      setSelectedAgentId(null);
+      agentDrawerRef.current?.close();
       setSelectedTeamId(null);
       setTeamForm(null);
-      setCardFlipped(false);
       setEditPanelOpen(false);
       setCmdRoom(fid);
       // 镜头聚焦与团队同构（flyToFocus 收集子组织+群+成员飞越拉近）
@@ -1321,9 +1320,7 @@ function OrgChartInner() {
       if (mgr) {
         setSelectedTeamId(null);
         setTeamForm(null);
-        setSelectedAgentId(mgr);
-        setCardFlipped(false);
-        setEditPanelOpen(false);
+        agentDrawerRef.current?.open(mgr, { orgId: fid, teamId: null });
       } else {
         router.push(folderHref(fid));
       }
@@ -1425,26 +1422,22 @@ function OrgChartInner() {
   }, [legacySlugHit, rootFolderId, aiOrg, router, folderPath]);
 
   // 成员/群点击 → overlay 抽屉（从右滑入，不压缩画布）
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  // DM 抽屉的窗上下文源——点击 agent 节点时
-  // 记录其所在列 teamId（团队列成员=群窗；org 直挂/管理者=null=纯 org 窗），
-  // 随 selectedAgentId 一起开合（关闭即清，窗=抽屉实例）。orgId 派生自
-  // rootFolderId（画布当前组织路径，URL 即真相）。
-  const [selectedAgentTeamId, setSelectedAgentTeamId] = useState<
-    string | null
-  >(null);
-  // 窗 orgId（点击时记录——org 节点/根横幅进入时=被点 org；agent 节点进入
-  // 时=当前画布 org 即 rootFolderId。挂载点优先此值，回退 rootFolderId）。
-  const [selectedAgentOrgId, setSelectedAgentOrgId] = useState<
-    string | null
-  >(null);
-  const [cardFlipped, setCardFlipped] = useState(false);
-  // 两段式抽屉：默认只弹聊天框；齿轮再滑出编辑/身份栏（选中新目标时复位）
+  // 成员抽屉态（窗上下文/cardFlipped/右栏三态/双栏宽度）内聚 AgentDrawer
+  // 组件——本页仅持 ref 句柄与互斥回调。
+  const agentDrawerRef = useRef<AgentDrawerHandle>(null);
+  const [agentDrawerAgentId, setAgentDrawerAgentId] = useState<string | null>(null);
+  const handleAgentDrawerOpen = useCallback((id: string) => {
+    // 互斥：成员抽屉开=清群/指挥室态
+    setSelectedTeamId(null);
+    setTeamForm(null);
+    setCmdRoom(null);
+    setAgentDrawerAgentId(id);
+  }, []);
+  const handleAgentDrawerClose = useCallback(() => {
+    setAgentDrawerAgentId(null);
+  }, []);
+  // 群/指挥室抽屉的右栏显隐与三态（agent 分支已内聚 AgentDrawer 组件）
   const [editPanelOpen, setEditPanelOpen] = useState(false);
-  // 右栏三态分段——'chat'=收起（editPanelOpen
-  // 仍为真值源），'edit'=身份卡/群编辑/组织编辑，'schedule'=定时任务
-  // 全景面。单聊/群/指挥室三类抽屉的凹陷分段双钮统一切换；sidebar
-  // 「编辑」入口恒回 edit 段（openDrawer 内重置）。
   const [rightPane, setRightPane] = useState<"edit" | "schedule">("edit");
   const openRightPane = (pane: "edit" | "schedule") => {
     if (editPanelOpen && rightPane === pane) {
@@ -1531,7 +1524,7 @@ function OrgChartInner() {
     (ids: string[]) => {
       if (ids.length === 0) return;
       const drawerOpenNow =
-        !!(selectedAgentId || selectedTeamId || cmdRoomOrgIdRef.current);
+        !!(agentDrawerAgentId || selectedTeamId || cmdRoomOrgIdRef.current);
       void fitView({
         nodes: ids.map((id) => ({ id })),
         duration: 600,
@@ -1548,7 +1541,7 @@ function OrgChartInner() {
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [fitView, selectedAgentId, selectedTeamId],
+    [fitView, agentDrawerAgentId, selectedTeamId],
   );
 
   // 聚焦群——team-{id} + agent-{teamId}-{aid}×memberIds（复合 id
@@ -1674,7 +1667,8 @@ function OrgChartInner() {
     (teamId: string, team: TeamConfig | undefined) => {
       if (!team) return;
       setCmdRoom(null);
-      setSelectedAgentId(null);
+      agentDrawerRef.current?.close();
+      setAgentDrawerAgentId(null);
       setSelectedTeamId(teamId);
       setEditPanelOpen(false);
       setTeamForm({
@@ -1703,37 +1697,20 @@ function OrgChartInner() {
         setTeamForm(null);
         setCmdRoom(null);
         const mgrId = node.data.managerAgentId as string;
-        setSelectedAgentId((prev) => {
-          const opening = prev !== mgrId;
-          setSelectedAgentTeamId(null);
-          if (opening) setSelectedAgentOrgId(rootFolderId);
-          return prev === mgrId ? null : mgrId;
-        });
-        setCardFlipped(false);
-        setEditPanelOpen(false);
+        agentDrawerRef.current?.open(mgrId, { orgId: rootFolderId, teamId: null });
       } else if (node.type === "agent" && typeof node.data.agentId === "string") {
         setSelectedTeamId(null);
         setTeamForm(null);
         setCmdRoom(null);
         const agentId = node.data.agentId as string;
-        // 阶段2：记录窗 teamId（data.teamId 团队列成员=群 id；org 直挂成员/
+        // 记录窗 teamId（data.teamId 团队列成员=群 id；org 直挂成员/
         // 管理者节点=null——node.data.teamId 在两类节点上均有定义）。
         const nodeTeamId =
           typeof node.data.teamId === "string" ? node.data.teamId : null;
-        setSelectedAgentId((prev) => {
-          const opening = prev !== agentId;
-          setSelectedAgentTeamId(opening ? nodeTeamId : null);
-          if (opening) setSelectedAgentOrgId(rootFolderId);
-          return prev === agentId ? null : agentId;
-        });
-        setCardFlipped(false);
-        setEditPanelOpen(false);
+        agentDrawerRef.current?.open(agentId, { orgId: rootFolderId, teamId: nodeTeamId });
       } else if (node.type === "team" && typeof node.data.teamId === "string") {
         // 画布化：再点同一群=收回抽屉（toggle；非同群则正常切换）
-        setSelectedAgentId((prev) => {
-          if (prev) return prev; // agent 抽屉开着不误清 team 判定
-          return prev;
-        });
+        agentDrawerRef.current?.close();
         if (selectedTeamId === node.data.teamId) {
           setSelectedTeamId(null);
           setTeamForm(null);
@@ -1757,17 +1734,10 @@ function OrgChartInner() {
         if (mgr) {
           setSelectedTeamId(null);
           setTeamForm(null);
-          // 阶段2：org 节点开管理者 DM——窗=被点的 org（folderGroup 节点的
+          // org 节点开管理者 DM——窗=被点的 org（folderGroup 节点的
           // folderId；从根画布进入时 rootFolderId=null，必须用节点值）。
           const nodeOrgId = node.data.folderId as string;
-          setSelectedAgentId((prev) => {
-            const opening = prev !== mgr;
-            setSelectedAgentTeamId(opening ? null : null);
-            if (opening) setSelectedAgentOrgId(nodeOrgId);
-            return prev === mgr ? null : mgr;
-          });
-          setCardFlipped(false);
-          setEditPanelOpen(false);
+          agentDrawerRef.current?.open(mgr, { orgId: nodeOrgId, teamId: null });
         } else {
           router.push(folderHref(node.data.folderId));
         }
@@ -1859,7 +1829,7 @@ function OrgChartInner() {
         return;
       try {
         await deletePybAgent(agentId);
-        setSelectedAgentId(null);
+        agentDrawerRef.current?.close();
         refreshAgents();
       } catch (err) {
         showErr("删除失败", err);
@@ -2047,58 +2017,6 @@ function OrgChartInner() {
   // org-ui 裁定：创建锚定组织——team=创建即挂靠（assign-team）；agent=暂无
   // org 挂靠数据位（任务2），创建后落自由成员池，用户可右键成员移入组织群
   const [createForFolder, setCreateForFolder] = useState<string | null>(null);
-
-  // 画布化改造：侧栏第二页行点击 → 右侧聊天抽屉（与画布点节点同效果）；
-  // 非画布路由跳入时经 sessionStorage 携带打开意图（挂载时消费即清）。
-  useEffect(() => {
-    const openDrawer = (kind: string, id: string, edit?: boolean) => {
-      if (kind === "agent") {
-        // 画布化：再点同一成员=收回抽屉（与 onNodeClick toggle 同规则）；
-        // edit=true 恒开并翻到身份卡背面编辑态
-        setSelectedAgentId((prev) => (edit || prev !== id ? id : null));
-        setSelectedTeamId(null);
-        setTeamForm(null);
-        // 身份卡面板显隐=editPanelOpen（非 cardFlipped）——edit 须两者同开。
-        // 换对象/编辑入口恒回 edit 段（rightPane 残留 schedule 会使
-        // sidebar 编辑入口错开定时任务面）
-        setCardFlipped(edit === true);
-        setEditPanelOpen(edit === true);
-        if (edit) setRightPane("edit");
-      } else if (kind === "team") {
-        // 抽屉渲染条件=selectedTeam && teamForm——与画布 onNodeClick 同走
-        // openTeam（同时设 selectedTeamId+teamForm），否则 teamForm 缺失渲染空白抽屉
-        if (!edit && selectedTeamId === id) {
-          setSelectedTeamId(null);
-          setTeamForm(null);
-          setEditPanelOpen(false);
-        } else {
-          openTeam(id, teams?.[id]);
-          setEditPanelOpen(edit === true);
-          if (edit) setRightPane("edit");
-        }
-        setCardFlipped(false);
-      } else if (kind === "orgRoom") {
-        // 侧栏组织行主点击=开指挥室——转 orgBodyClickBridge
-        // 复用静默幂等创建+toggle 单一入口（含互斥清 agent/team 态）
-        void orgBodyClickBridge?.(id);
-      }
-    };
-    const onEvt = (e: Event) => {
-      const d = (e as CustomEvent<{ kind?: string; id?: string; edit?: boolean }>).detail;
-      if (d?.kind && d.id) openDrawer(d.kind, d.id, d.edit === true);
-    };
-    window.addEventListener(ROSTER_DRAWER_OPEN_EVENT, onEvt);
-    try {
-      const raw = window.sessionStorage.getItem("pyb-desktop_open_drawer");
-      if (raw) {
-        window.sessionStorage.removeItem("pyb-desktop_open_drawer");
-        const d = JSON.parse(raw) as { kind?: string; id?: string; edit?: boolean };
-        if (d?.kind && d.id) openDrawer(d.kind, d.id, d.edit === true);
-      }
-    } catch { /* 静默 */ }
-    return () => window.removeEventListener(ROSTER_DRAWER_OPEN_EVENT, onEvt);
-    // team 分支读 selectedTeamId/teams/openTeam——依赖须随动，否则闭包过期
-  }, [selectedTeamId, teams, openTeam]);
 
   const onPaneContextMenu = useCallback((e: MouseEvent | React.MouseEvent) => {
     e.preventDefault();
@@ -2331,6 +2249,90 @@ function OrgChartInner() {
     return { nodes: ns, edges: es };
   }, [nodes, edges, focusedTeamId, focusedFolderId, aiOrg]);
 
+
+  // 搜索聚焦（画布世界）：agent 节点 id 有三形态（团队列 agent-{tid}-{aid} /
+  // 自由池 loose-{aid} / 直挂 orgdirect-{aid}）——按 data.agentId 扫节点最稳；
+  // 管理者无独立节点（folder 容器 data.managerAgentId 承载）→ 聚焦其 folder。
+  const focusAgentCanvas = useCallback(
+    (agentId: string) => {
+      const n = styledNodes.find(
+        (x) => x.type === "agent" && x.data?.agentId === agentId,
+      );
+      if (n) {
+        flyToFocus([n.id]);
+        return;
+      }
+      const mgrOrg = Object.entries(orgManagers).find(
+        ([, m]) => m === agentId,
+      );
+      if (mgrOrg) flyToFocus([`folder-${mgrOrg[0]}`]);
+    },
+    [styledNodes, flyToFocus, orgManagers],
+  );
+
+  // 画布化改造：侧栏第二页行点击 → 右侧聊天抽屉（与画布点节点同效果）；
+  // 非画布路由跳入时经 sessionStorage 携带打开意图（挂载时消费即清）。
+  useEffect(() => {
+    const openDrawer = (kind: string, id: string, edit?: boolean) => {
+      if (kind === "agent") {
+        // agent 分支唯一执行体在 AgentDrawer 组件监听器——本函数经 onEvt
+        // 消费同事件，此处再调 ref.open 会双触发（open→toggle 双关）。
+        // 抽屉归组件开；镜头聚焦此处补（搜索聚焦语义，节点不在当前
+        // 画布时静默让位——抽屉照开）。
+        focusAgentCanvas(id);
+        return;
+      } else if (kind === "team") {
+        // 抽屉渲染条件=selectedTeam && teamForm——与画布 onNodeClick 同走
+        // openTeam（同时设 selectedTeamId+teamForm），否则 teamForm 缺失渲染空白抽屉
+        agentDrawerRef.current?.close();
+        if (!edit && selectedTeamId === id) {
+          setSelectedTeamId(null);
+          setTeamForm(null);
+          setEditPanelOpen(false);
+        } else {
+          openTeam(id, teams?.[id]);
+          setEditPanelOpen(edit === true);
+          if (edit) setRightPane("edit");
+        }
+        // 镜头飞越（搜索聚焦语义；团队节点不在当前画布路径时静默让位）
+        if (styledNodes.some((n) => n.id === `team-${id}`))
+          focusTeamCamera(id);
+      } else if (kind === "orgRoom") {
+        // 侧栏组织行主点击=开指挥室——转 orgBodyClickBridge
+        // 复用静默幂等创建+toggle 单一入口（含互斥清 agent/team 态）
+        void orgBodyClickBridge?.(id);
+        // 镜头聚焦（组织容器在当前画布时）
+        if (styledNodes.some((n) => n.id === `folder-${id}`))
+          focusFolderCamera(id);
+      }
+    };
+    const onEvt = (e: Event) => {
+      const d = (e as CustomEvent<{ kind?: string; id?: string; edit?: boolean }>).detail;
+      if (d?.kind && d.id) openDrawer(d.kind, d.id, d.edit === true);
+    };
+    window.addEventListener(ROSTER_DRAWER_OPEN_EVENT, onEvt);
+    try {
+      const raw = window.sessionStorage.getItem("pyb-desktop_open_drawer");
+      if (raw) {
+        window.sessionStorage.removeItem("pyb-desktop_open_drawer");
+        const d = JSON.parse(raw) as { kind?: string; id?: string; edit?: boolean };
+        if (d?.kind && d.id) {
+          // agent 意图直调 ref（一次性路径，不经事件——避免与组件监听器
+          // 双发；AgentDrawer 子组件 effect 先于本页运行，ref 必已挂）。
+          // team/orgRoom 仍走 openDrawer。
+          if (d.kind === "agent") {
+            agentDrawerRef.current?.open(d.id, { orgId: null, teamId: null }, { edit: d.edit === true });
+          } else {
+            openDrawer(d.kind, d.id, d.edit === true);
+          }
+        }
+      }
+    } catch { /* 静默 */ }
+    return () => window.removeEventListener(ROSTER_DRAWER_OPEN_EVENT, onEvt);
+    // team 分支读 selectedTeamId/teams/openTeam——依赖须随动，否则闭包过期
+  }, [selectedTeamId, teams, openTeam, focusAgentCanvas, focusTeamCamera, focusFolderCamera]);
+
+
   const onNodesChange = useCallback(() => {}, []);
 
   // 视口抢夺修复——fitView 只在「视图意图」变化时
@@ -2401,10 +2403,11 @@ function OrgChartInner() {
     );
   }
 
-  const selectedAgent =
-    selectedAgentId && agents ? agents[selectedAgentId] : null;
   const selectedTeam = selectedTeamId && teams ? teams[selectedTeamId] : null;
-  const drawerOpen = !!selectedAgent || !!selectedTeam || !!cmdRoomOrgId;
+  // 群/指挥室旧骨架容器的滑入判定——不含 agentDrawerAgentId（成员抽屉
+  // AgentDrawer 组件自管 transform；旧值含它会在点成员时滑入一个内容
+  // 为 null 的空壳叠在 AgentDrawer 上方——真机坐实"画布点成员弹空白"）
+  const drawerOpen = !!selectedTeam || !!cmdRoomOrgId;
 
   return (
     <div className="relative h-full w-full">
@@ -2488,7 +2491,7 @@ function OrgChartInner() {
           closeCtxMenu();
           // 画布化改造：点画布空白 → 通知侧栏浮层收起 + 收拢右侧聊天抽屉
           window.dispatchEvent(new Event(SIDEBAR_FLOAT_CLOSE_EVENT));
-          setSelectedAgentId(null);
+          agentDrawerRef.current?.close();
           setSelectedTeamId(null);
           setTeamForm(null);
           // 指挥室抽屉同律收拢（与其他聊天窗一致）
@@ -2520,7 +2523,17 @@ function OrgChartInner() {
         )}
       </ReactFlow>
 
-      {/* 成员/群 overlay 抽屉·两段式：默认仅聊天框；齿轮滑出编辑/身份栏（栏顶自带 X） */}
+      {/* 成员抽屉（抽出组件——窗上下文/右栏三态/宽度全内聚；
+          agent 分支事件监听也在组件内，city 页同源消费） */}
+      <AgentDrawer
+        ref={agentDrawerRef}
+        agents={agents}
+        onSaved={refreshAgents}
+        onOpen={handleAgentDrawerOpen}
+        onClose={handleAgentDrawerClose}
+      />
+
+      {/* 群/指挥室 overlay 抽屉·两段式：默认仅聊天框；齿轮滑出编辑/身份栏（栏顶自带 X） */}
       <div
         className={cn(
           "absolute inset-y-0 right-0 z-10 bg-card shadow-2xl overflow-hidden flex",
@@ -2552,147 +2565,7 @@ function OrgChartInner() {
           )}
           title="拖拽调整宽度"
         />
-        {selectedAgent ? (
-          <>
-            <div className="flex min-w-0 flex-1 flex-col h-full">
-              {/* 头部主题色渐变：单聊=agent avatarColor（160deg 12% alpha 渐至透明） */}
-              <div
-                className="flex items-center justify-between px-4 py-3 border-b"
-                style={
-                  selectedAgent.avatar_color
-                    ? {
-                        background: `linear-gradient(160deg, ${selectedAgent.avatar_color}1F 0%, transparent 100%)`,
-                      }
-                    : undefined
-                }
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <AgentAvatar
-                    agentId={selectedAgent.agent_id ?? selectedAgentId ?? ""}
-                    name={selectedAgent.name}
-                    shape={selectedAgent.avatar_shape}
-                    colorHex={selectedAgent.avatar_color}
-                    size={28}
-                  />
-                  <span className="truncate text-sm font-medium">
-                    {selectedAgent.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  {/* 凹陷分段双钮（设置编辑/定时任务）；
-                      再点当前段=收起右栏（openRightPane 三态语义）。
-                      视觉语言：10px 圆角凹槽式分段触发器——
-                      实色底+选中段实心主色沉槽（非凸起药丸） */}
-                  <div className="flex items-center rounded-[10px] border bg-muted p-0.5 text-xs">
-                    {(
-                      [
-                        ["edit", "设置编辑"],
-                        ["schedule", "定时任务"],
-                      ] as Array<["edit" | "schedule", string]>
-                    ).map(([pane, label]) => (
-                      <button
-                        key={pane}
-                        type="button"
-                        onClick={() => openRightPane(pane)}
-                        className={
-                          "rounded-[8px] px-2.5 py-1 transition-colors " +
-                          (editPanelOpen && rightPane === pane
-                            ? "bg-primary font-medium text-primary-foreground"
-                            : "text-muted-foreground hover:text-primary")
-                        }
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => {
-                      setSelectedAgentId(null);
-                      setSelectedAgentOrgId(null);
-                      setSelectedAgentTeamId(null);
-                    }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-              <div className="min-h-0 flex-1">
-                <TeammateChat
-                  agentId={selectedAgentId ?? ""}
-                  agentName={selectedAgent.name}
-                  chatContext={
-                    (selectedAgentOrgId ?? rootFolderId)
-                      ? {
-                          orgId: (selectedAgentOrgId ?? rootFolderId)!,
-                          ...(selectedAgentTeamId
-                            ? { teamId: selectedAgentTeamId }
-                            : {}),
-                        }
-                      : undefined
-                  }
-                />
-              </div>
-            </div>
-            <div
-              className={cn(
-                "relative h-full shrink-0 border-l bg-card flex-col",
-                "transition-transform duration-300 ease-in-out overflow-hidden",
-                !editPanelOpen && "translate-x-full absolute right-0 top-0",
-              )}
-              style={{ display: editPanelOpen ? "flex" : "none", width: editW }}
-            >
-              {/* 编辑栏左缘拖拽柄：左右拉伸编辑/身份栏（聊天框宽度不联动） */}
-              <div
-                onMouseDown={startEditResize}
-                className={cn(
-                  "absolute left-0 inset-y-0 z-20 w-1.5 cursor-col-resize",
-                  "hover:bg-primary/40 transition-colors",
-                  editResizing && "bg-primary/60",
-                )}
-                title="拖拽调整栏宽"
-              />
-              {/* 右栏按段切——schedule 段渲染定时任务全景面（无标题
-                  行，SchedulePane 自带头部；edit 段保持原身份卡形态） */}
-              {rightPane === "schedule" ? (
-                <div className="min-h-0 flex-1">
-                  <SchedulePane
-                    recipient={{ kind: "agent", id: selectedAgentId ?? "" }}
-                    recipientLabel={selectedAgent.name}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between px-4 py-3 border-b">
-                    <h2 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                      身份卡
-                    </h2>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      title="收起身份卡"
-                      onClick={() => setEditPanelOpen(false)}
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <div className="min-h-0 flex-1 px-3 pb-3">
-                    <IdentityCard
-                      agentId={selectedAgentId ?? ""}
-                      agent={selectedAgent}
-                      onSaved={refreshAgents}
-                      flipped={cardFlipped}
-                      onFlippedChange={setCardFlipped}
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          </>
-        ) : cmdRoomOrgId ? (
+        {cmdRoomOrgId ? (
           <>
             {/* key=orgId 强制重建——同实例只换 props 时内部 usePolling/消息
                 state 残留旧组织数据（探针坐实：桥已切换而界面停第一个组织） */}
@@ -2799,8 +2672,8 @@ function OrgChartInner() {
                   <div className="flex items-center rounded-[10px] border bg-muted p-0.5 text-xs">
                     {(
                       [
-                        ["edit", "群编辑"],
-                        ["schedule", "定时任务"],
+                        ["edit", "编辑"],
+                        ["schedule", "任务"],
                       ] as Array<["edit" | "schedule", string]>
                     ).map(([pane, label]) => (
                       <button
@@ -3602,3 +3475,5 @@ export default function OrgChartPage() {
     </div>
   );
 }
+
+

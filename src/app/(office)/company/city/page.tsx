@@ -4,12 +4,11 @@
  * /company/city 3D 城市视图。
  * 主体：形状×颜色 3D bot（avatarShape 映射）+ org 街区（orgId 哈希色）
  * + 阻尼运镜 + SSE 说话反馈（CHAT_MESSAGE_EVENT）+ snapshot 重拉。
- * 交互：点击 bot 相机飞向+信息卡（跳既有 /agents/[id]）；DOM 浮层
+ * 交互：点击 bot 相机飞向+信息卡（「详情」开画布同款成员抽屉）；DOM 浮层
  * 分组胶囊（absolute inset-0 模式）点击飞街区；ESC/点空白回全景。
  */
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import { Sky } from "three/addons/objects/Sky.js";
 import { getAgents, getTeams, type AgentConfig, type TeamConfig } from "@/lib/api";
@@ -21,6 +20,25 @@ import {
 } from "@/lib/live-events";
 import { ROSTER_CHANGED_EVENT } from "@/lib/roster-events";
 import { fallbackColorHex } from "@/components/agent/agent-avatar";
+// 成员右侧抽屉（画布同款——事件监听随组件走，侧栏入口同源生效）
+import { AgentDrawer, type AgentDrawerHandle } from "@/components/agent/agent-drawer";
+// 地基详情卡：侧栏 team/orgRoom 入口补听（本页在 /company 前缀下 sidebar
+// 只派事件不写意图，agent 分支 AgentDrawer 接、其余分支此处接）
+import { ROSTER_DRAWER_OPEN_EVENT } from "@/lib/drawer-events";
+// 指挥室抽屉就地弹出（组织详情保持 3D 背景——不跳画布）
+import { CmdRoomDrawer } from "@/components/cmdroom-drawer";
+import { createOrgRoom, markPybRead, savePybTeam } from "@/lib/api";
+import { savePybOrg } from "@/lib/ai-org-engine";
+// team 抽屉就地弹出（与成员/指挥室同构）
+import { ChatRoomView } from "@/components/chatroom-view";
+import { TeamEditor, type TeamFormData } from "@/components/team-editor";
+import { GroupAvatar } from "@/components/team/group-avatar";
+import { cn } from "@/lib/utils";
+// 右栏三态载体（与画布指挥室同构）
+import { SchedulePane } from "@/components/agent/schedule-pane";
+import { AI_ORG_CHANGED_EVENT } from "@/components/sidebar";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 // ── 形状×几何体 ──────────────────────────────────────────────────────────
 
@@ -683,6 +701,72 @@ interface TeamPlot {
 
 const FREE_BLOCK_ID = "__free__";
 const FREE_TEAMS_BLOCK_ID = "__free_teams__";
+
+/**
+ * 组织编辑面板（city 指挥室抽屉右栏 edit 段——与画布页同构拷贝：
+ * 改名走 savePybOrg，成功后派 AI_ORG_CHANGED_EVENT 令组织树刷新）。
+ */
+function CityOrgEditPanel({
+  orgId,
+  orgName,
+  managerAgentId,
+  onSaved,
+}: {
+  orgId: string;
+  orgName: string;
+  managerAgentId: string | null;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState(orgName);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-6 overflow-y-auto">
+      <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+        组织编辑
+      </h3>
+      <label className="flex flex-col gap-1 text-xs">
+        组织名称
+        <input
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            setSaved(false);
+          }}
+          className="rounded-md border bg-background px-2 py-1.5 text-sm"
+          placeholder="组织名称"
+        />
+      </label>
+      <div className="text-[11px] text-muted-foreground">
+        管理者：{managerAgentId ? managerAgentId : "（自动创建）"}
+        （换管理者暂未开放，走引擎 OrgUpdate）
+      </div>
+      {error ? <div className="text-xs text-red-500">{error}</div> : null}
+      {saved ? <div className="text-xs text-emerald-600">已保存</div> : null}
+      <Button
+        size="sm"
+        className="h-8 text-xs"
+        disabled={saving || !name.trim() || name.trim() === orgName}
+        onClick={async () => {
+          setSaving(true);
+          setError("");
+          try {
+            await savePybOrg(orgId, { name: name.trim() });
+            setSaved(true);
+            onSaved();
+          } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        {saving ? "保存中…" : "保存"}
+      </Button>
+    </div>
+  );
+}
 /** 紧凑间距体系：容器近乎贴边（颜色/描边区分），成员步距小 */
 const BLOCK_GAP = 1;
 const GRID = 7;
@@ -712,6 +796,12 @@ interface CityWorld {
   }>;
   teams: TeamPlot[];
   radius: number;
+  /** 任意 orgId（含子组织）→ 所属顶层根组织 id（根自身映射到自身）。
+   *  搜索聚焦用：子组织在 3D 无独立地基，聚焦其根台面。 */
+  orgRoot: Map<string, string>;
+  /** 挂靠组织的 teamId → 挂靠根组织 id（独立团队不含）。
+   *  搜索聚焦用：挂靠团队无独立台面，聚焦其根台面+就地开群抽屉。 */
+  teamRoot: Map<string, string>;
 }
 
 /** 顶层组织一块大台面，整棵子树成员平铺网格。
@@ -1036,11 +1126,14 @@ function layoutCity(
     ...blocks.map((b) => Math.abs(b.x) + b.size / 2),
     0,
   );
+  // rootByOrg（orgId→rootId）已存在——直出 orgRoot；teamRoot 取 orgTeamRoot
   return {
     bots,
     blocks,
     teams: teamPlots,
     radius: maxExt + 14,
+    orgRoot: rootByOrg,
+    teamRoot: orgTeamRoot,
   };
 }
 
@@ -1102,13 +1195,263 @@ export default function CityPage() {
     );
   }, [agents, aiOrg, teams]);
 
-  // ESC 回全景
+  // 成员抽屉（AgentDrawer——点击 bot 直开，3D 背景保留）
+  const agentDrawerRef = useRef<AgentDrawerHandle>(null);
+
+  // 地基直开抽屉（无详情卡中转）：组织台面→就地弹指挥室（CmdRoomDrawer，
+  // 3D 背景保留）；独立团队台面→就地弹群聊抽屉（ChatRoomView+TeamEditor
+  // 全功能，同构）。合成容器（自由区/独立团队区，platform:false）无对应
+  // 实体——仅飞镜头。
+  // 指挥室就地弹出态（与成员抽屉互斥）
+  const [cmdRoomOrgId, setCmdRoomOrgId] = useState<string | null>(null);
+  // 指挥室抽屉同构能力（与 AgentDrawer/画布指挥室同律）：
+  // 宽度拖拽（localStorage 记忆+钳制）+ 右栏三态（edit 组织编辑/schedule 定时任务）
+  const DRAWER_W_KEY = "pyb-desktop_drawer_chat_width";
+  const EDIT_W_KEY = "pyb-desktop_drawer_edit_width";
+  const [cmdDrawerW, setCmdDrawerW] = useState(440);
+  const cmdDrawerWRef = useRef(440);
+  const [cmdEditW, setCmdEditW] = useState(320);
+  const cmdEditWRef = useRef(320);
+  const [cmdResizing, setCmdResizing] = useState(false);
+  const [cmdEditResizing, setCmdEditResizing] = useState(false);
+  const [cmdEditPanelOpen, setCmdEditPanelOpen] = useState(false);
+  const [cmdRightPane, setCmdRightPane] = useState<"edit" | "schedule">("edit");
+  useEffect(() => {
+    let w = Math.round(window.innerWidth / 3);
+    let ew = 320;
+    try {
+      const sw = Number(window.localStorage.getItem(DRAWER_W_KEY));
+      if (sw >= 360) w = sw;
+      const sew = Number(window.localStorage.getItem(EDIT_W_KEY));
+      if (sew >= 240 && sew <= 600) ew = sew;
+    } catch { /* 静默 */ }
+    setCmdDrawerW(w);
+    cmdDrawerWRef.current = w;
+    setCmdEditW(ew);
+    cmdEditWRef.current = ew;
+  }, []);
+  useEffect(() => {
+    const onWinResize = () => {
+      const max = Math.min(window.innerWidth * 0.85, window.innerWidth - 80);
+      if (cmdDrawerWRef.current > max) {
+        cmdDrawerWRef.current = Math.round(max);
+        setCmdDrawerW(Math.round(max));
+      }
+      if (cmdEditWRef.current > max) {
+        cmdEditWRef.current = Math.round(max);
+        setCmdEditW(Math.round(max));
+      }
+    };
+    window.addEventListener("resize", onWinResize);
+    return () => window.removeEventListener("resize", onWinResize);
+  }, []);
+  const startCmdResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setCmdResizing(true);
+    const w0 = cmdDrawerWRef.current;
+    const x0 = e.clientX;
+    const onMove = (ev: MouseEvent) => {
+      const max = Math.min(window.innerWidth * 0.85, window.innerWidth - 80);
+      const w = Math.max(360, Math.min(max, w0 + (x0 - ev.clientX)));
+      cmdDrawerWRef.current = Math.round(w);
+      setCmdDrawerW(Math.round(w));
+    };
+    const onUp = () => {
+      setCmdResizing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      try {
+        window.localStorage.setItem(DRAWER_W_KEY, String(cmdDrawerWRef.current));
+      } catch { /* 静默 */ }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+  const startCmdEditResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setCmdEditResizing(true);
+    const w0 = cmdEditWRef.current;
+    const x0 = e.clientX;
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.max(240, Math.min(600, w0 + (x0 - ev.clientX)));
+      cmdEditWRef.current = Math.round(w);
+      setCmdEditW(Math.round(w));
+    };
+    const onUp = () => {
+      setCmdEditResizing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      try {
+        window.localStorage.setItem(EDIT_W_KEY, String(cmdEditWRef.current));
+      } catch { /* 静默 */ }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+  const openCmdRightPane = (pane: "edit" | "schedule") => {
+    if (cmdEditPanelOpen && cmdRightPane === pane) {
+      setCmdEditPanelOpen(false);
+      return;
+    }
+    setCmdRightPane(pane);
+    setCmdEditPanelOpen(true);
+  };
+  // team 抽屉就地弹出态（与成员/指挥室同构：宽度拖拽+右栏三态+表单保存）
+  const [teamDrawerId, setTeamDrawerId] = useState<string | null>(null);
+  const [teamForm, setTeamForm] = useState<TeamFormData | null>(null);
+  const [teamSaving, setTeamSaving] = useState(false);
+  const [teamError, setTeamError] = useState("");
+  const [teamDrawerW, setTeamDrawerW] = useState(440);
+  const teamDrawerWRef = useRef(440);
+  const [teamEditW, setTeamEditW] = useState(320);
+  const teamEditWRef = useRef(320);
+  const [teamResizing, setTeamResizing] = useState(false);
+  const [teamEditResizing, setTeamEditResizing] = useState(false);
+  const [teamEditPanelOpen, setTeamEditPanelOpen] = useState(false);
+  const [teamRightPane, setTeamRightPane] = useState<"edit" | "schedule">("edit");
+  useEffect(() => {
+    try {
+      const sw = Number(window.localStorage.getItem(DRAWER_W_KEY));
+      if (sw >= 360) {
+        setTeamDrawerW(sw);
+        teamDrawerWRef.current = sw;
+      }
+      const sew = Number(window.localStorage.getItem(EDIT_W_KEY));
+      if (sew >= 240 && sew <= 600) {
+        setTeamEditW(sew);
+        teamEditWRef.current = sew;
+      }
+    } catch { /* 静默 */ }
+  }, []);
+  const startTeamResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setTeamResizing(true);
+    const w0 = teamDrawerWRef.current;
+    const x0 = e.clientX;
+    const onMove = (ev: MouseEvent) => {
+      const max = Math.min(window.innerWidth * 0.85, window.innerWidth - 80);
+      const w = Math.max(360, Math.min(max, w0 + (x0 - ev.clientX)));
+      teamDrawerWRef.current = Math.round(w);
+      setTeamDrawerW(Math.round(w));
+    };
+    const onUp = () => {
+      setTeamResizing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      try {
+        window.localStorage.setItem(DRAWER_W_KEY, String(teamDrawerWRef.current));
+      } catch { /* 静默 */ }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+  const startTeamEditResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setTeamEditResizing(true);
+    const w0 = teamEditWRef.current;
+    const x0 = e.clientX;
+    const onMove = (ev: MouseEvent) => {
+      const w = Math.max(240, Math.min(600, w0 + (x0 - ev.clientX)));
+      teamEditWRef.current = Math.round(w);
+      setTeamEditW(Math.round(w));
+    };
+    const onUp = () => {
+      setTeamEditResizing(false);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      try {
+        window.localStorage.setItem(EDIT_W_KEY, String(teamEditWRef.current));
+      } catch { /* 静默 */ }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+  const openTeamRightPane = (pane: "edit" | "schedule") => {
+    if (teamEditPanelOpen && teamRightPane === pane) {
+      setTeamEditPanelOpen(false);
+      return;
+    }
+    setTeamRightPane(pane);
+    setTeamEditPanelOpen(true);
+  };
+  const closeTeamDrawer = useCallback(() => {
+    setTeamDrawerId(null);
+    setTeamForm(null);
+    setTeamEditPanelOpen(false);
+  }, []);
+  const openTeamLocal = useCallback((teamId: string) => {
+    const t = teams?.[teamId];
+    if (!t) return;
+    setSelectedBot(null);
+    agentDrawerRef.current?.close();
+    setCmdRoomOrgId(null);
+    setTeamDrawerId(teamId);
+    setTeamForm({
+      id: teamId,
+      name: t.name,
+      description: t.description ?? "",
+      agents: [...new Set(t.agents)],
+      leader: t.agents.includes(t.leader_agent) ? t.leader_agent : "",
+    });
+    setTeamError("");
+    setTeamEditPanelOpen(false);
+    setTeamRightPane("edit");
+    void markPybRead(teamId).catch(() => {});
+  }, [teams]);
+  const saveTeamFormLocal = useCallback(async () => {
+    if (!teamForm || !teamDrawerId) return;
+    setTeamSaving(true);
+    setTeamError("");
+    try {
+      await savePybTeam(teamDrawerId, {
+        members: teamForm.agents,
+        ...(teamForm.name.trim() ? { name: teamForm.name.trim() } : {}),
+        ...(teamForm.description.trim()
+          ? { description: teamForm.description.trim() }
+          : {}),
+        leader: teamForm.leader || "",
+      });
+      refreshTeams();
+    } catch (err) {
+      setTeamError((err as Error).message);
+    } finally {
+      setTeamSaving(false);
+    }
+  }, [teamForm, teamDrawerId, refreshTeams]);
+
+  const openOrgRoomLocal = useCallback((orgId: string) => {
+    setSelectedBot(null);
+    agentDrawerRef.current?.close();
+    closeTeamDrawer();
+    setCmdRoomOrgId(orgId);
+    // 换室右栏复位（与 AgentDrawer 换目标同律）
+    setCmdEditPanelOpen(false);
+    setCmdRightPane("edit");
+    // 进室即 mark 已读 + 幂等创建后台执行（画布 orgBodyClickBridge 同律）
+    void markPybRead(`cmdroom_${orgId}`).catch(() => {});
+    void createOrgRoom(orgId).catch((err: unknown) => {
+      window.alert(`指挥室创建失败：${err instanceof Error ? err.message : String(err)}`);
+    });
+  }, [closeTeamDrawer]);
+  const openPlotDrawer = useCallback((kind: "orgRoom" | "team", id: string) => {
+    if (kind === "orgRoom") {
+      openOrgRoomLocal(id);
+      return;
+    }
+    openTeamLocal(id);
+  }, [openOrgRoomLocal, openTeamLocal]);
+
+  // ESC 回全景（含成员抽屉/指挥室抽屉收拢）
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setFocus(null);
         setSelectedBot(null);
         setActiveBlockId(null);
+        setCmdRoomOrgId(null);
+        setCmdEditPanelOpen(false);
+        closeTeamDrawer();
+        agentDrawerRef.current?.close();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -1138,6 +1481,10 @@ export default function CityPage() {
     setFocus(null);
     setSelectedBot(null);
     setActiveBlockId(null);
+    setCmdRoomOrgId(null);
+    setCmdEditPanelOpen(false);
+    closeTeamDrawer();
+    agentDrawerRef.current?.close();
   };
 
   const focusBlock = (blockId: string) => {
@@ -1146,9 +1493,11 @@ export default function CityPage() {
     setActiveBlockId(blockId);
     setSelectedBot(null);
     setFocus({ point: [b.x, 0, b.z], distance: Math.max(10, b.size * 1.4) });
+    // 组织台面（platform:true 且非合成 id）直开指挥室；合成容器仅飞镜头
+    if (b.platform && !blockId.startsWith("__")) openOrgRoomLocal(blockId);
   };
 
-  // 团队台面点击=飞向该团队（与组织台同款语言）
+  // 团队台面点击=飞向该团队+直开群聊抽屉（就地，3D 背景保留）
   const focusTeamPlot = (teamId: string) => {
     const t = world?.teams.find((x) => x.id === teamId);
     if (!t) return;
@@ -1158,15 +1507,71 @@ export default function CityPage() {
       point: [t.x, 0, t.z],
       distance: Math.max(6, t.radius * 3),
     });
+    openTeamLocal(teamId);
   };
 
   const focusBot = (bot: PlacedBot) => {
     setSelectedBot(bot);
+    setCmdRoomOrgId(null);
+    closeTeamDrawer();
     setFocus({ point: bot.position, distance: 5 });
+    // 直开成员抽屉（3D 背景保留）
+    agentDrawerRef.current?.open(bot.agentId, {
+      orgId: null,
+      teamId: bot.teamId ?? null,
+    });
   };
 
+  // 侧栏/搜索 team/orgRoom 入口补听并就地开对应抽屉 + 镜头聚焦。
+  // deps 随动：openTeamLocal 读 teams 数据，闭包钉首帧会在数据未加载时
+  // 静默短路（真机坐实：侧栏点团队无反应、组织正常）。
+  // 搜索聚焦语义（3D 世界）：org（含子组织）→ 根台面聚焦+指挥室；
+  // team → 有台面飞台面，挂靠团队飞其根台面（无独立地基，归并语义）；
+  // agent → 该 bot 位置聚焦+成员抽屉（AgentDrawer 组件内监听不负责镜头，
+  // agent 分支此处补聚焦，抽屉仍由组件开——两监听各司其职不冲突）。
+  const focusAgentLocal = useCallback((agentId: string) => {
+    const bot = world?.bots.find((b) => b.agentId === agentId);
+    if (!bot) return;
+    setSelectedBot(bot);
+    setCmdRoomOrgId(null);
+    closeTeamDrawer();
+    setFocus({ point: bot.position, distance: 5 });
+  }, [world, closeTeamDrawer]);
+  const focusOrgRootLocal = useCallback((orgId: string) => {
+    const rootId = world?.orgRoot.get(orgId) ?? orgId;
+    const b = world?.blocks.find((x) => x.id === rootId && x.platform);
+    if (b) setFocus({ point: [b.x, 0, b.z], distance: Math.max(10, b.size * 1.4) });
+  }, [world]);
+  const focusTeamLocal = useCallback((teamId: string) => {
+    // 有独立台面（world.teams）飞台面；挂靠团队飞根台面（teamRoot 映射）
+    const plot = world?.teams.find((t) => t.id === teamId);
+    if (plot) {
+      setFocus({ point: [plot.x, 0, plot.z], distance: Math.max(6, plot.radius * 3) });
+      return;
+    }
+    const rootId = world?.teamRoot.get(teamId);
+    if (rootId) {
+      const b = world?.blocks.find((x) => x.id === rootId && x.platform);
+      if (b) setFocus({ point: [b.x, 0, b.z], distance: Math.max(10, b.size * 1.4) });
+    }
+  }, [world]);
+  useEffect(() => {
+    const onEvt = (e: Event) => {
+      const d = (e as CustomEvent<{ kind?: string; id?: string }>).detail;
+      if (!d?.kind || !d.id) return;
+      if (d.kind === "team" || d.kind === "orgRoom") {
+        openPlotDrawer(d.kind, d.id);
+        if (d.kind === "team") focusTeamLocal(d.id);
+        else focusOrgRootLocal(d.id);
+      } else if (d.kind === "agent") {
+        focusAgentLocal(d.id);
+      }
+    };
+    window.addEventListener(ROSTER_DRAWER_OPEN_EVENT, onEvt);
+    return () => window.removeEventListener(ROSTER_DRAWER_OPEN_EVENT, onEvt);
+  }, [openPlotDrawer, focusTeamLocal, focusOrgRootLocal, focusAgentLocal]);
+
   // 点击空白（canvas 非 bot 区）回全景——onPointerMissed
-  const selectedAgentFull = selectedBot && agents?.[selectedBot.agentId];
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-slate-950">
@@ -1303,46 +1708,251 @@ export default function CityPage() {
         </span>
       </div>
 
-      {/* 选中 bot 信息卡（右侧悬浮卡，城市语言） */}
-      {selectedBot && (
-        <div className="absolute bottom-6 right-6 z-10 w-64 rounded-2xl border border-white/10 bg-slate-900/85 p-4 shadow-[-24px_0_60px_-20px_rgba(0,0,0,0.6)] backdrop-blur">
-          <div className="flex items-center gap-3">
+      {/* 焦点态提示 */}
+      {focus && !selectedBot && (
+        <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-xs text-slate-500">
+          ESC 或点空白处返回全景
+        </div>
+      )}
+
+      {/* 成员右侧抽屉（画布同款；z-10 与画布页同层级，浮窗侧栏共存） */}
+      <AgentDrawer
+        ref={agentDrawerRef}
+        agents={agents ?? undefined}
+        onSaved={refreshAgents}
+      />
+
+      {/* 指挥室抽屉就地弹出（组织详情——3D 背景保留；与 AgentDrawer/画布
+          指挥室同构：宽度拖拽+右栏三态） */}
+      {cmdRoomOrgId && (
+        <div
+          className={
+            "absolute inset-y-0 right-0 z-10 flex overflow-hidden bg-card shadow-2xl sm:inset-y-3 sm:right-3 sm:rounded-3xl sm:shadow-[-24px_0_60px_-20px_rgba(15,23,42,0.35)] " +
+            (cmdResizing ? "transition-none" : "transition-all duration-300 ease-in-out")
+          }
+          style={{
+            width: cmdDrawerW + (cmdEditPanelOpen ? cmdEditW : 0),
+            maxWidth: "85vw",
+          }}
+        >
+          {/* 左缘拖拽柄（聊天栏宽度） */}
+          <div
+            onMouseDown={startCmdResize}
+            className={
+              "absolute left-0 inset-y-0 z-20 w-1.5 cursor-col-resize " +
+              "hover:bg-primary/40 transition-colors sm:inset-y-4 sm:rounded-full " +
+              (cmdResizing ? "bg-primary/60" : "")
+            }
+            title="拖拽调整宽度"
+          />
+          <CmdRoomDrawer
+            key={cmdRoomOrgId}
+            orgId={cmdRoomOrgId}
+            orgName={
+              aiOrg?.folders.find((f) => f.id === cmdRoomOrgId)?.name ?? cmdRoomOrgId
+            }
+            editPanelOpen={cmdEditPanelOpen}
+            rightPane={cmdRightPane}
+            onOpenPane={openCmdRightPane}
+            onClose={() => {
+              setCmdRoomOrgId(null);
+              setCmdEditPanelOpen(false);
+            }}
+          />
+          {/* 右栏三态：edit=组织编辑 / schedule=指挥室级定时任务 */}
+          <div
+            className={
+              "relative h-full shrink-0 border-l bg-card flex-col overflow-hidden transition-transform duration-300 ease-in-out" +
+              (!cmdEditPanelOpen ? " translate-x-full absolute right-0 top-0" : "")
+            }
+            style={{ display: cmdEditPanelOpen ? "flex" : "none", width: cmdEditW }}
+          >
+            {/* 编辑栏左缘拖拽柄 */}
             <div
-              className="flex h-10 w-10 items-center justify-center text-sm font-bold text-white"
-              style={{ backgroundColor: selectedBot.color, borderRadius: "50%" }}
-            >
-              {selectedBot.name.slice(0, 2)}
-            </div>
-            <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-slate-100">
-                {selectedBot.name}
+              onMouseDown={startCmdEditResize}
+              className={
+                "absolute left-0 inset-y-0 z-20 w-1.5 cursor-col-resize " +
+                "hover:bg-primary/40 transition-colors" +
+                (cmdEditResizing ? " bg-primary/60" : "")
+              }
+              title="拖拽调整栏宽"
+            />
+            {cmdRightPane === "schedule" ? (
+              <div className="min-h-0 flex-1">
+                <SchedulePane
+                  recipient={{ kind: "group", id: `cmdroom_${cmdRoomOrgId}` }}
+                  recipientLabel={
+                    aiOrg?.folders.find((f) => f.id === cmdRoomOrgId)?.name ?? cmdRoomOrgId
+                  }
+                />
               </div>
-              <div className="truncate text-xs text-slate-400">
-                {selectedAgentFull?.title || selectedBot.agentId.slice(0, 14)}
-              </div>
-            </div>
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Link
-              href={`/agents/${encodeURIComponent(selectedBot.agentId)}`}
-              className="flex-1 rounded-lg bg-white/10 px-3 py-1.5 text-center text-xs text-slate-200 transition hover:bg-white/20"
-            >
-              详情页
-            </Link>
-            <button
-              onClick={exitFocus}
-              className="rounded-lg bg-white/5 px-3 py-1.5 text-xs text-slate-400 transition hover:bg-white/10"
-            >
-              ESC 返回
-            </button>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1.5 top-1.5 z-10 h-7 text-xs"
+                  title="收起组织编辑"
+                  onClick={() => setCmdEditPanelOpen(false)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <CityOrgEditPanel
+                  orgId={cmdRoomOrgId}
+                  orgName={
+                    aiOrg?.folders.find((f) => f.id === cmdRoomOrgId)?.name ?? ""
+                  }
+                  managerAgentId={aiOrg?.managers?.[cmdRoomOrgId] ?? null}
+                  onSaved={() => {
+                    window.dispatchEvent(new Event(AI_ORG_CHANGED_EVENT));
+                  }}
+                />
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* 焦点态提示 */}
-      {focus && (
-        <div className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 text-xs text-slate-500">
-          ESC 或点空白处返回全景
+      {/* team 抽屉就地弹出（与成员/指挥室同构：宽度拖拽+右栏三态群编辑/定时任务） */}
+      {teamDrawerId && teamForm && teams?.[teamDrawerId] && (
+        <div
+          className={
+            "absolute inset-y-0 right-0 z-10 flex overflow-hidden bg-card shadow-2xl sm:inset-y-3 sm:right-3 sm:rounded-3xl sm:shadow-[-24px_0_60px_-20px_rgba(15,23,42,0.35)] " +
+            (teamResizing ? "transition-none" : "transition-all duration-300 ease-in-out")
+          }
+          style={{
+            width: teamDrawerW + (teamEditPanelOpen ? teamEditW : 0),
+            maxWidth: "85vw",
+          }}
+        >
+          {/* 左缘拖拽柄（聊天栏宽度） */}
+          <div
+            onMouseDown={startTeamResize}
+            className={
+              "absolute left-0 inset-y-0 z-20 w-1.5 cursor-col-resize " +
+              "hover:bg-primary/40 transition-colors sm:inset-y-4 sm:rounded-full " +
+              (teamResizing ? "bg-primary/60" : "")
+            }
+            title="拖拽调整宽度"
+          />
+          <div className="flex min-w-0 flex-1 flex-col h-full">
+            {/* 头部主题色渐变：团队=leader avatarColor（与画布同律） */}
+            <div
+              className="flex items-center justify-between px-4 py-3 border-b"
+              style={
+                agents?.[teams[teamDrawerId].leader_agent]?.avatar_color
+                  ? {
+                      background: `linear-gradient(160deg, ${agents[teams[teamDrawerId].leader_agent].avatar_color}1F 0%, transparent 100%)`,
+                    }
+                  : undefined
+              }
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <GroupAvatar
+                  memberIds={teams[teamDrawerId].agents}
+                  agents={agents ?? {}}
+                  size={28}
+                />
+                <span className="truncate text-sm font-medium">
+                  {teams[teamDrawerId].name}
+                </span>
+                <span className="text-[10px] text-muted-foreground shrink-0">
+                  {teamForm.agents.length} 人
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {/* 群抽屉同律凹陷分段双钮（群编辑/定时任务） */}
+                <div className="flex items-center rounded-[10px] border bg-muted p-0.5 text-xs">
+                  {(
+                    [
+                      ["edit", "编辑"],
+                      ["schedule", "任务"],
+                    ] as Array<["edit" | "schedule", string]>
+                  ).map(([pane, label]) => (
+                    <button
+                      key={pane}
+                      type="button"
+                      onClick={() => openTeamRightPane(pane)}
+                      className={
+                        "rounded-[8px] px-2.5 py-1 transition-colors " +
+                        (teamEditPanelOpen && teamRightPane === pane
+                          ? "bg-primary font-medium text-primary-foreground"
+                          : "text-muted-foreground hover:text-primary")
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={closeTeamDrawer}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1">
+              <ChatRoomView
+                teamId={teamDrawerId}
+                teamName={teams[teamDrawerId].name}
+              />
+            </div>
+          </div>
+          {/* 右栏三态：edit=群编辑 / schedule=群级定时任务 */}
+          <div
+            className={cn(
+              "relative h-full shrink-0 border-l bg-card flex-col",
+              "transition-transform duration-300 ease-in-out overflow-hidden",
+              !teamEditPanelOpen && "translate-x-full absolute right-0 top-0",
+            )}
+            style={{ display: teamEditPanelOpen ? "flex" : "none", width: teamEditW }}
+          >
+            {/* 编辑栏左缘拖拽柄 */}
+            <div
+              onMouseDown={startTeamEditResize}
+              className={cn(
+                "absolute left-0 inset-y-0 z-20 w-1.5 cursor-col-resize",
+                "hover:bg-primary/40 transition-colors",
+                teamEditResizing && "bg-primary/60",
+              )}
+              title="拖拽调整栏宽"
+            />
+            {teamRightPane === "schedule" ? (
+              <div className="min-h-0 flex-1">
+                <SchedulePane
+                  recipient={{ kind: "group", id: teamDrawerId }}
+                  recipientLabel={teams[teamDrawerId].name}
+                />
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1.5 top-1.5 z-10 h-7 text-xs"
+                  title="收起团队编辑"
+                  onClick={() => setTeamEditPanelOpen(false)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <div className="min-h-0 flex-1">
+                  <TeamEditor
+                    form={teamForm}
+                    setForm={setTeamForm}
+                    isNew={false}
+                    saving={teamSaving}
+                    error={teamError}
+                    onSave={saveTeamFormLocal}
+                    availableAgents={agents ?? {}}
+                    compact
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

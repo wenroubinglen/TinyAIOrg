@@ -32,6 +32,7 @@ export function CmdRoomDrawer({
   rightPane,
   onOpenPane,
   onClose,
+  hidePanes,
 }: {
   orgId: string;
   orgName: string;
@@ -41,6 +42,9 @@ export function CmdRoomDrawer({
   /** 段切换回调（含再点当前段=收起的三态语义） */
   onOpenPane: (pane: "edit" | "schedule") => void;
   onClose: () => void;
+  /** 隐藏分段双钮（city 宿主形态：编辑栏/定时任务面是画布内联渲染，
+   *  city 无承载——挂死按钮误导，故藏） */
+  hidePanes?: boolean;
 }) {
   const { data: agents } = usePolling<Record<string, AgentConfig>>(getAgents, 0);
 
@@ -128,28 +132,30 @@ export function CmdRoomDrawer({
           {/* 指挥室抽屉同律凹陷分段双钮（组织编辑/定时任务——指挥室
               级用户特权通道，与单聊/群抽屉三态语义同构）。
               视觉语言：10px 圆角凹槽式分段触发器 */}
-          <div className="flex items-center rounded-[10px] border bg-muted p-0.5 text-xs">
-            {(
-              [
-                ["edit", "组织编辑"],
-                ["schedule", "定时任务"],
-              ] as Array<["edit" | "schedule", string]>
-            ).map(([pane, label]) => (
-              <button
-                key={pane}
-                type="button"
-                onClick={() => onOpenPane(pane)}
-                className={
-                  "rounded-[8px] px-2.5 py-1 transition-colors " +
-                  (editPanelOpen && rightPane === pane
-                    ? "bg-primary font-medium text-primary-foreground"
-                    : "text-muted-foreground hover:text-primary")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {!hidePanes && (
+            <div className="flex items-center rounded-[10px] border bg-muted p-0.5 text-xs">
+              {(
+                [
+                  ["edit", "编辑"],
+                  ["schedule", "任务"],
+                ] as Array<["edit" | "schedule", string]>
+              ).map(([pane, label]) => (
+                <button
+                  key={pane}
+                  type="button"
+                  onClick={() => onOpenPane(pane)}
+                  className={
+                    "rounded-[8px] px-2.5 py-1 transition-colors " +
+                    (editPanelOpen && rightPane === pane
+                      ? "bg-primary font-medium text-primary-foreground"
+                      : "text-muted-foreground hover:text-primary")
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onClose}>
             <X className="h-3.5 w-3.5" />
           </Button>

@@ -431,20 +431,28 @@ function TeamsPage() {
           </h2>
           <div className="flex flex-wrap gap-3">
             {unassignedAgents.map(([id, agent]) => (
-              <Link key={id} href={`/agents/${id}`}>
-                <div className="flex items-center gap-2 border border-dashed px-3 py-2 hover:border-primary/50 transition-colors cursor-pointer">
-                  <div className={cn(
-                    "flex h-6 w-6 items-center justify-center text-[9px] font-bold uppercase shrink-0 text-white",
-                    agentColor(id),
-                  )}>
-                    {agent.name.slice(0, 2)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{agent.name}</p>
-                    <p className="text-[10px] text-muted-foreground">@{id}</p>
-                  </div>
+              <button
+                key={id}
+                onClick={() => {
+                  // /agents/[id] 已删——跳画布开成员抽屉（sidebar 同源机制）
+                  try {
+                    window.sessionStorage.setItem("pyb-desktop_open_drawer", JSON.stringify({ kind: "agent", id }));
+                  } catch { /* 静默 */ }
+                  router.push("/company");
+                }}
+                className="flex items-center gap-2 border border-dashed px-3 py-2 hover:border-primary/50 transition-colors cursor-pointer"
+              >
+                <div className={cn(
+                  "flex h-6 w-6 items-center justify-center text-[9px] font-bold uppercase shrink-0 text-white",
+                  agentColor(id),
+                )}>
+                  {agent.name.slice(0, 2)}
                 </div>
-              </Link>
+                <div>
+                  <p className="text-sm font-medium">{agent.name}</p>
+                  <p className="text-[10px] text-muted-foreground">@{id}</p>
+                </div>
+              </button>
             ))}
           </div>
         </div>

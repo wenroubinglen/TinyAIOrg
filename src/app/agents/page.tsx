@@ -15,7 +15,6 @@ import {
   Bot, Plus, Pencil, Trash2,
   X, Check, Loader2, Zap,
 } from "lucide-react";
-import Link from "next/link";
 import { AgentAvatar } from "@/components/agent/agent-avatar";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +33,16 @@ function AgentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: agents, loading, refresh } = usePolling<Record<string, AgentConfig>>(getAgents, 0);
+
+  // 成员抽屉意图（/agents/[id] 路由已删——跳画布开抽屉，
+  // 与 sidebar openRosterDrawer 的 sessionStorage 意图机制同源同键）
+  const openDrawerIntent = (agentId: string) => {
+    try {
+      window.sessionStorage.setItem("pyb-desktop_open_drawer", JSON.stringify({ kind: "agent", id: agentId }));
+    } catch { /* 静默 */ }
+    router.push("/company");
+  };
+
   const [editing, setEditing] = useState<FormData | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -111,8 +120,8 @@ function AgentsPage() {
         const created = await createPybAgent({ name: name.trim(), description: description.trim() });
         setEditing(null);
         notifyRosterChanged("agents");
-        // 建完即进聊天（零断流）
-        router.push(`/agents/${created.agent_id}`);
+        // 建完即聊（零断流）——跳画布开成员抽屉（路由页已删）
+        openDrawerIntent(created.agent_id);
         return;
       } else {
         await savePybAgent(id, { name });
@@ -141,11 +150,11 @@ function AgentsPage() {
       const n = agents ? Object.keys(agents).length + 1 : 1;
       const created = await createPybAgent({
         name: `新队友 ${n}`,
-        description: "新创建的队友，人设待完善——可在详情页 Profile tab 编辑职责描述。",
+        description: "新创建的队友，人设待完善——可在画布抽屉身份卡编辑职责描述。",
       });
       refresh();
       notifyRosterChanged("agents");
-      router.push(`/agents/${created.agent_id}`);
+      openDrawerIntent(created.agent_id);
     } catch (err) {
       setError(describeCreateError((err as Error).message));
     } finally {
@@ -214,7 +223,7 @@ function AgentsPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">
-                  描述 {isNew ? "（必填——将成为队友的人设）" : "（详情页 Profile tab 编辑）"}
+                  描述 {isNew ? "（必填——将成为队友的人设）" : "（抽屉身份卡编辑）"}
                 </label>
                 {isNew ? (
                   <Textarea
@@ -226,7 +235,7 @@ function AgentsPage() {
                   />
                 ) : (
                   <p className="text-xs text-muted-foreground border rounded-md px-3 py-2 bg-muted/40">
-                    人设（description）在详情页 Profile tab 编辑——这里只改显示名称。
+                    人设（description）在画布抽屉的身份卡编辑——这里只改显示名称。
                   </p>
                 )}
               </div>
@@ -299,11 +308,19 @@ function TeammateCard({
   deleting: boolean;
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const router = useRouter();
+
+  const openDrawer = () => {
+    try {
+      window.sessionStorage.setItem("pyb-desktop_open_drawer", JSON.stringify({ kind: "agent", id }));
+    } catch { /* 静默 */ }
+    router.push("/company");
+  };
 
   return (
-    <Link href={`/agents/${id}`} className="block">
+    <div className="block cursor-pointer" onClick={openDrawer}>
       <Card className="transition-colors hover:border-primary/50 cursor-pointer">
-        <CardHeader>
+      <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <AgentAvatar
@@ -320,8 +337,8 @@ function TeammateCard({
                 <CardDescription>@{id}</CardDescription>
               </div>
             </div>
-            <div className="flex items-center gap-1" onClick={(e) => e.preventDefault()}>
-              <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); onEdit(); }} className="h-8 w-8">
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onEdit(); }} className="h-8 w-8">
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
               {confirmDelete ? (
@@ -329,18 +346,18 @@ function TeammateCard({
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={(e) => { e.preventDefault(); onDelete(); setConfirmDelete(false); }}
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDelete(); setConfirmDelete(false); }}
                     disabled={deleting}
                     className="h-8 text-xs"
                   >
                     {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Delete"}
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.preventDefault(); setConfirmDelete(false); }} className="h-8 text-xs">
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setConfirmDelete(false); }} className="h-8 text-xs">
                     No
                   </Button>
                 </div>
               ) : (
-                <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); setConfirmDelete(true); }} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setConfirmDelete(true); }} className="h-8 w-8 text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               )}
@@ -356,12 +373,12 @@ function TeammateCard({
           </div>
           <div className="pt-2 border-t">
             <p className="text-xs text-muted-foreground">
-              点击进入详情页（Chat / Profile / Memory / Plan / 自省+知识库 / Skills / Schedule）
+              点击在画布打开聊天抽屉（聊天 / 身份卡 / 任务）
             </p>
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </div>
   );
 }
 

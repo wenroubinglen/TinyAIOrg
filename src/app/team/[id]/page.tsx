@@ -156,7 +156,7 @@ function TeamChatPage({
         <button
           type="button"
           onClick={openDrawer}
-          title="群编辑"
+          title="编辑"
           disabled={!team}
           className="flex items-center cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
         >
