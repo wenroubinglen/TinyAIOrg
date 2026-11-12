@@ -56,7 +56,7 @@ else {
 for (const p of GET_EXPECTED) {
   if (p === "/health") continue;
   const s = await probe("GET", p);
-  const ok = s !== 404;
+  const ok = typeof s === "number" && s !== 404;
   if (!ok) fail++;
   console.log((ok ? "✓" : "✗"), "GET", p, s);
 }
@@ -70,7 +70,7 @@ const WRITE_PROBES = [
 ];
 for (const [m, p, b] of WRITE_PROBES) {
   const s = await probe(m, p, b);
-  const ok = s !== 404;
+  const ok = typeof s === "number" && s !== 404;
   if (!ok) fail++;
   console.log((ok ? "✓" : "✗"), m, p, s);
 }
