@@ -65,7 +65,9 @@
 
 ## Notes
 
-> ⚠️ **Currently only Windows is supported.** Linux and macOS support will arrive in future releases.
+> 1. ⚠️ **Currently only Windows is supported.** Linux and macOS support will arrive in future releases.
+> 2. 🔥 **Organizations can nest into many layers — the deeper the tree, the larger the token consumption, which may explode.** Test with caution; start with small-scale organizations.
+> 3. 🚧 **The project is still under rapid iteration and features may be unstable.** If you run into problems, please report them promptly via [Contact](#contact) or open an [Issue](https://github.com/wenroubinglen/TinyAIOrg/issues).
 
 ---
 

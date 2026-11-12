@@ -65,7 +65,9 @@
 
 ## 注意事项
 
-> ⚠️ **当前仅支持 Windows 系统**，Linux 与 macOS 将在后续版本支持。
+> 1. ⚠️ **当前仅支持 Windows 系统**，Linux 与 macOS 将在后续版本支持。
+> 2. 🔥 **组织支持多层嵌套，层数越深 Token 消耗越大，可能急剧膨胀**——请谨慎测试使用，建议先从小规模组织开始。
+> 3. 🚧 **项目仍在快速迭代中，功能可能不稳定**——遇到问题请及时通过[联系方式](#联系方式)反馈，或直接提 [Issues](https://github.com/wenroubinglen/TinyAIOrg/issues)。
 
 ---
 
