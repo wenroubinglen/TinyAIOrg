@@ -1,6 +1,6 @@
-# TinyAIOrg
-
 <div align="center">
+
+# TinyAIOrg
 
 [![GitHub Stars](https://img.shields.io/github/stars/wenroubinglen/TinyAIOrg?style=social)](https://github.com/wenroubinglen/TinyAIOrg/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/wenroubinglen/TinyAIOrg?style=social)](https://github.com/wenroubinglen/TinyAIOrg/network/members)
