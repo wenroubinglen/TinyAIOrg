@@ -1,9 +1,12 @@
 /**
  * 附件卡片（DM/群聊共用）。
  *
- * 图片直显（字节 URL <img>，onError 兜底图标）；其余 kind 渲染文件卡
+ * 图片直显（字节 URL <img>，onError 兜底图标）+ 点击放大模态（P1：
+ * createPortal 全屏遮罩，Esc/点遮罩关闭）；其余 kind 渲染文件卡
  * （图标+名称+尺寸）。draft 模式带移除按钮（composer 草稿区用）。
  */
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Paperclip, FileText, FileImage, FileVideo, FileAudio, X } from "lucide-react";
 import { attachmentByteUrl, type AttachmentRef } from "@/lib/api";
 
@@ -26,6 +29,51 @@ function kindIcon(kind: string) {
   }
 }
 
+/** 图片放大模态：全屏遮罩 + 居中大图，Esc/点遮罩关闭。 */
+function ImageLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`查看图片 ${alt}`}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className="max-h-full max-w-full rounded-md object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute right-4 top-4 rounded-full bg-background/80 p-2 shadow-md transition-colors hover:bg-background"
+        aria-label="关闭"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>,
+    document.body,
+  );
+}
+
 export function AttachmentCard({
   ownerId,
   attachment,
@@ -38,6 +86,9 @@ export function AttachmentCard({
   previewUrl?: string;
   onRemove?: () => void;
 }) {
+  const [lightbox, setLightbox] = useState(false);
+  // 加载失败的图不可点开（onError 兜底切文件卡形态，模态无意义）。
+  const [imgBroken, setImgBroken] = useState(false);
   const isImage = attachment.kind === "image";
   const src = previewUrl ?? attachmentByteUrl(ownerId, attachment.id);
   return (
@@ -46,11 +97,14 @@ export function AttachmentCard({
         <img
           src={src}
           alt={attachment.name}
-          className="max-h-40 rounded-md object-cover"
+          className={`max-h-40 rounded-md object-cover${imgBroken ? "" : " cursor-zoom-in transition-opacity hover:opacity-90"}`}
+          onClick={() => {
+            if (!imgBroken) setLightbox(true);
+          }}
           onError={(e) => {
             // 字节 404/加载失败兜底：换文件卡形态（不裂图）。
-            const el = e.currentTarget;
-            el.style.display = "none";
+            setImgBroken(true);
+            e.currentTarget.style.display = "none";
           }}
         />
       ) : (
@@ -77,6 +131,9 @@ export function AttachmentCard({
         >
           <X className="h-3 w-3" />
         </button>
+      ) : null}
+      {lightbox && !imgBroken ? (
+        <ImageLightbox src={src} alt={attachment.name} onClose={() => setLightbox(false)} />
       ) : null}
     </div>
   );

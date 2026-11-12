@@ -20,6 +20,7 @@ import {
   PromptInputAction,
 } from "@/components/ui/prompt-input";
 import { cn } from "@/lib/utils";
+import { Markdown } from "@/components/ui/markdown";
 import {
   AttachmentCard,
   uploadDraftAttachments,
@@ -31,7 +32,8 @@ import { ModelConfigSelect } from "@/components/chat/model-config-select";
 /**
  * 单 teammate 聊天窗（自 agents/[id] 页抽出复用——组织架构页
  * overlay 抽屉同源消费）：历史 = pyb/agent.messages（真相源 pyb 库）；
- * 发送 = /api/pyb-agents/:id/send（pyb/agent.send RPC 直达，fromAgentId=main）；
+ * 发送 = /api/pyb-agents/:id/send（pyb/agent.send RPC 直达，一等用户身份
+ * speaker:{kind:'user'} 引擎侧盖戳——用户消息不经 SendMessage 工具）；
  * 刷新 = 轮询（推送流单 session 守卫——轮询是设计形态）。
  * 附件输入（按钮/粘贴/拖拽，上限6）+卡片渲染+
  * 纯附件消息判据修正（content||attachments）。
@@ -294,9 +296,11 @@ export function TeammateChat({
             <div
               key={i}
               className={cn(
-                "max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap",
+                // agent 气泡走 Markdown（自管换行），用户气泡保持
+                // 纯文本 pre-wrap——用户自己打的字不该被解析。
+                "max-w-[80%] rounded-lg px-4 py-2 text-sm",
                 isUser
-                  ? "ml-auto bg-[var(--chat-user-bubble)] text-[var(--chat-user-bubble-fg)]"
+                  ? "ml-auto bg-[var(--chat-user-bubble)] text-[var(--chat-user-bubble-fg)] whitespace-pre-wrap"
                   : "bg-muted",
                 continued && "mt-0.5",
               )}
@@ -311,7 +315,15 @@ export function TeammateChat({
                   ))}
                 </div>
               ) : null}
-              {m.content || ""}
+              {isUser
+                ? (m.content || "")
+                : m.content
+                  ? (
+                    <Markdown className="prose prose-sm dark:prose-invert mt-0.5 max-w-none break-words text-foreground/90">
+                      {m.content}
+                    </Markdown>
+                  )
+                  : null}
             </div>
             );
           })

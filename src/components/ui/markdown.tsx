@@ -3,6 +3,7 @@ import ReactMarkdown, { Components } from "react-markdown";
 import { marked } from "marked";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { Link2 } from "lucide-react";
 
 import { CodeBlock, CodeBlockCode } from "./code-block";
 import { cn } from "@/lib/utils";
@@ -27,7 +28,59 @@ function languageFromClassName(className?: string): string {
 
 const INLINE_CODE_CLASS = "bg-primary-foreground rounded-sm px-1 font-mono text-sm";
 
+/** Pull hostname out of an href for the link card label. */
+function hostFromHref(href: string): string {
+  try {
+    return new URL(href).host;
+  } catch {
+    return href;
+  }
+}
+
+/** Truncate long hrefs so bare-URL cards stay inside the bubble. */
+function truncateHref(href: string, max = 48): string {
+  return href.length > max ? `${href.slice(0, max)}…` : href;
+}
+
+const LINK_ANCHOR_CLASS =
+  "text-primary underline underline-offset-2 hover:opacity-80 break-all";
+
 const DEFAULT_COMPONENTS: Partial<Components> = {
+  // Bare URLs (GFM autolink) render as a compact link card; labeled
+  // [text](url) links stay inline. All external links open in a new tab.
+  a: function MarkdownLink({ href, children, node: _node, ...props }) {
+    const url = href ?? "";
+    const childrenText = Array.isArray(children)
+      ? children.map((c) => (typeof c === "string" ? c : "")).join("")
+      : typeof children === "string"
+        ? children
+        : "";
+    const isBareUrl =
+      /^https?:\/\//i.test(childrenText) || childrenText.trim() === "" || /^www\./i.test(childrenText.trim());
+
+    if (isBareUrl) {
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="my-1 flex max-w-full items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs no-underline transition-colors hover:bg-muted"
+        >
+          <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="flex min-w-0 flex-col">
+            <span className="font-medium text-foreground">{hostFromHref(url)}</span>
+            <span className="block truncate text-muted-foreground">{truncateHref(childrenText.trim() || url)}</span>
+          </span>
+        </a>
+      );
+    }
+
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className={LINK_ANCHOR_CLASS} {...props}>
+        {children}
+      </a>
+    );
+  },
   // Fenced blocks are rendered through CodeBlock; inline code gets a chip look.
   code: function MarkdownCode({ className, children, ...props }) {
     const startPos = props.node?.position?.start.line;

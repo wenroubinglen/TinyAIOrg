@@ -887,55 +887,6 @@ export async function deleteTeam(id: string): Promise<{ ok: boolean }> {
   return apiFetch(`/api/teams/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
-export async function sendMessage(payload: {
-  message: string;
-  agent?: string;
-  sender?: string;
-  channel?: string;
-}): Promise<{ ok: boolean; messageId: string }> {
-  // agent 目标在场时走 daemon 面 send 端点并携带一等用户
-  // 身份（speaker {kind:'user'}）——引擎侧以用户身份落库，不再冒名 main。
-  // /api/message 队面通道仅剩无 agent 目标的兜底（CLI web 面兼容路径）。
-  if (payload.agent) {
-    const res = await apiFetch<{
-      ok: boolean;
-      delivered: boolean;
-      messageId: string | null;
-    }>(`/api/pyb-agents/${encodeURIComponent(payload.agent)}/send`, {
-      method: "POST",
-      body: JSON.stringify({
-        message: payload.message,
-        speaker: { kind: "user" },
-      }),
-    });
-    return { ok: res.ok, messageId: res.messageId ?? "" };
-  }
-  return apiFetch("/api/message", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function getAgentMessages(
-  agentId: string,
-  limit = 100,
-  sinceId = 0,
-): Promise<AgentMessage[]> {
-  const params = new URLSearchParams({
-    limit: String(limit),
-    since_id: String(sinceId),
-  });
-  // 形状守卫：daemon 面无此端点（404 throw）——回退空数组。
-  try {
-    const res = await apiFetch<unknown>(
-      `/api/agents/${encodeURIComponent(agentId)}/messages?${params.toString()}`,
-    );
-    return Array.isArray(res) ? (res as AgentMessage[]) : [];
-  } catch {
-    return [];
-  }
-}
-
 // ── Agent Workspace Data ──────────────────────────────────────────────────
 
 export interface WorkspaceSkill {
