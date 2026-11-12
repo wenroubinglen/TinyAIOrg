@@ -23,22 +23,17 @@
 
 ## 演示
 
-<table>
-  <tr>
-    <td width="33%" align="center" valign="top">
-      <img src="public/1.gif" width="100%" alt="全局搜索聚焦：搜索框按世界分发，输入即定位到画布或城市中的目标成员">
-      <br><sub>全局搜索聚焦</sub>
-    </td>
-    <td width="33%" align="center" valign="top">
-      <img src="public/2.gif" width="100%" alt="抽屉式会话：在组织/团队/成员三类视图中就地弹出会话抽屉">
-      <br><sub>抽屉式会话</sub>
-    </td>
-    <td width="33%" align="center" valign="top">
-      <img src="public/3.gif" width="100%" alt="3D 天空之城：组织树与队友的可视化世界，点开建筑即达成员会话">
-      <br><sub>3D 天空之城</sub>
-    </td>
-  </tr>
-</table>
+**全局搜索聚焦** —— 搜索框按世界分发，输入即定位到画布或城市中的目标成员：
+
+<img src="public/1.gif" alt="全局搜索聚焦演示" width="960">
+
+**抽屉式会话** —— 在组织/团队/成员三类视图中就地弹出会话抽屉，不打断当前页面：
+
+<img src="public/2.gif" alt="抽屉会话演示" width="960">
+
+**3D 天空之城** —— 组织树与队友的可视化世界，点开建筑即达成员会话：
+
+<img src="public/3.gif" alt="3D 天空之城演示" width="960">
 
 ---
 

@@ -23,22 +23,17 @@
 
 ## Demos
 
-<table>
-  <tr>
-    <td width="33%" align="center" valign="top">
-      <img src="public/1.gif" width="100%" alt="Global search & focus: the search box dispatches per world, typing instantly locates the target member on canvas or in the city">
-      <br><sub>Global Search & Focus</sub>
-    </td>
-    <td width="33%" align="center" valign="top">
-      <img src="public/2.gif" width="100%" alt="Drawer conversations: session drawers pop in place across org/team/member views without leaving the page">
-      <br><sub>Drawer Conversations</sub>
-    </td>
-    <td width="33%" align="center" valign="top">
-      <img src="public/3.gif" width="100%" alt="3D Sky City: a visual world of your org tree and teammates, click a building to jump into the member's conversation">
-      <br><sub>3D Sky City</sub>
-    </td>
-  </tr>
-</table>
+**Global Search & Focus** — the search box dispatches per world; typing instantly locates the target member on canvas or in the city:
+
+<img src="public/1.gif" alt="Global search & focus demo" width="960">
+
+**Drawer Conversations** — session drawers pop in place across org/team/member views without leaving the page:
+
+<img src="public/2.gif" alt="Drawer conversations demo" width="960">
+
+**3D Sky City** — a visual world of your org tree and teammates; click a building to jump into the member's conversation:
+
+<img src="public/3.gif" alt="3D Sky City demo" width="960">
 
 ---
 
