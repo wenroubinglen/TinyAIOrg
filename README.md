@@ -6,7 +6,7 @@
 
 **全局搜索聚焦** —— 搜索框按世界分发，输入即定位到画布或城市中的目标成员：
 
-![3D 天空之城演示](public/1.gif)
+![全局搜索聚焦演示](public/1.gif)
 
 **抽屉式会话** —— 在组织/团队/成员三类视图中就地弹出会话抽屉，不打断当前页面：
 
@@ -14,7 +14,7 @@
 
 
 **3D 天空之城** —— 组织树与队友的可视化世界，点开建筑即达成员会话：
-![搜索聚焦演示](public/3.gif)
+![3D 天空之城演示](public/3.gif)
 
 ## 功能
 
@@ -34,12 +34,12 @@ npm install -g pybao-xc-sdk
 pyb daemon start   # 启动常驻引擎（默认 127.0.0.1:3779）
 ```
 
-> 模型供应商与 API Key 无需在此步配置——启动 TinyOrg 后在「设置 → 模型」页完成配置（内置 10 家厂商模板 + 自定义 OpenAI/Anthropic 兼容端点，支持在线测试连通）。
+> 模型供应商与 API Key 无需在此步配置——启动 TinyAIOrg 后在「设置 → 模型」页完成配置（内置 10 家厂商模板 + 自定义 OpenAI/Anthropic 兼容端点，支持在线测试连通）。
 
 ## 启动
 
 ```bash
-git clone https://github.com/wenroubinglen/TinyAIOrg.git && cd TinyOrg
+git clone https://github.com/wenroubinglen/TinyAIOrg.git && cd TinyAIOrg
 bun install        # 或 npm install
 bun run dev        # 或 npm run dev → http://localhost:3000
 ```
@@ -59,7 +59,7 @@ bun run lint    # eslint
 
 ### API 契约 smoke
 
-`scripts/contract-smoke.mjs` 对运行中的 daemon 探测 TinyOrg 依赖的全部端点，用于引擎升级后快速验证兼容性：
+`scripts/contract-smoke.mjs` 对运行中的 daemon 探测 TinyAIOrg 依赖的全部端点，用于引擎升级后快速验证兼容性：
 
 ```bash
 node scripts/contract-smoke.mjs            # 默认 127.0.0.1:3779
