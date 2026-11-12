@@ -2,6 +2,20 @@
 
 **TinyOrg** 是一个通过多层级组织树、团队挂载、指挥室实现无限嵌套的多智能体协助架构的AI项目——把你的 AI 队友、团队、组织搬进一个页面：组织架构、3D天空之城、全部在浏览器里直接操作。——所有数据都在你本机。
 
+## 演示
+
+**3D 天空之城** —— 组织树与队友的可视化世界，点开建筑即达成员会话：
+
+![3D 天空之城演示](public/1.gif)
+
+**抽屉式会话** —— 在组织/团队/成员三类视图中就地弹出会话抽屉，不打断当前页面：
+
+![抽屉会话演示](public/2.gif)
+
+**全局搜索聚焦** —— 搜索框按世界分发，输入即定位到画布或城市中的目标成员：
+
+![搜索聚焦演示](public/3.gif)
+
 ## 功能
 
 - **公司 / 3D天空之城**：组织结构与队友的可视化，点开成员即达会话
@@ -25,7 +39,7 @@ pyb daemon start   # 启动常驻引擎（默认 127.0.0.1:3779）
 ## 启动
 
 ```bash
-git clone https://github.com/wenroubinglen/TinyOrg.git && cd TinyOrg
+git clone https://github.com/wenroubinglen/TinyAIOrg.git && cd TinyOrg
 bun install        # 或 npm install
 bun run dev        # 或 npm run dev → http://localhost:3000
 ```
