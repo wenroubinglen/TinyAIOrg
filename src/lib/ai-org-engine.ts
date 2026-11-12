@@ -67,10 +67,10 @@ export async function getOrgs(): Promise<Record<string, OrgConfig>> {
   return out;
 }
 
-/** 更新组织（透传 name/parent_id/manager_agent_id——引擎 PUT 已支持三字段）。 */
+/** 更新组织（透传 name/parent_id——管理者与组织一体，不可更换）。 */
 export async function savePybOrg(
   id: string,
-  payload: { name?: string; parent_id?: string | null; manager_agent_id?: string },
+  payload: { name?: string; parent_id?: string | null },
 ): Promise<void> {
   await apiFetch(`/api/pyb-orgs/${encodeURIComponent(id)}`, {
     method: "PUT",

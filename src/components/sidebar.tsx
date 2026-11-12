@@ -320,7 +320,13 @@ export function Sidebar() {
     const onRosterChanged = (e: Event) => {
       const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
       if (kind === "teams" || kind === "all" || !kind) refreshTeams();
-      if (kind === "agents" || kind === "all" || !kind) refreshAgents();
+      if (kind === "agents" || kind === "all" || !kind) {
+        refreshAgents();
+        // agent 挂靠关系（state.orgId）随创建/assign 静默变——sidebar
+        // 组织区成员明细从 aiOrg 派生，agents 事件同样需转译刷新（与
+        // orgs 分支同款事件桥；444 真机案同族缺口）。
+        window.dispatchEvent(new Event(AI_ORG_CHANGED_EVENT));
+      }
       // 组织变更经 roster 事件桥到 AI_ORG_CHANGED_EVENT——sidebar/画布页
       // 既有监听统一重拉 loadAiOrgFromEngine（收敛点不变）。all/缺省兜底
       // 同转译：跨 scope 变更（如建 org 连带管理者 agent）不漏刷新。

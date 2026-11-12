@@ -1367,7 +1367,14 @@ function OrgChartInner() {
     // 轮询兜底）。all/缺省兜底全刷，防跨 scope 变更漏刷。
     const onRosterChanged = (e: Event) => {
       const kind = (e as CustomEvent<{ kind?: string }>).detail?.kind;
-      if (kind === "agents" || kind === "all" || !kind) refreshAgents();
+      if (kind === "agents" || kind === "all" || !kind) {
+        refreshAgents();
+        // agent 挂靠关系（state.orgId）随创建/assign 变——画布归位依赖
+        // aiOrg.agentOrg 映射（agents API org_id 投影），agents 事件同样
+        // 需要重拉 org 投影（444 真机案：DevVerify04 已挂靠 444 但画布落
+        // 自由成员容器——对齐 City 页三路全刷形态）。
+        refreshAiOrg();
+      }
       if (kind === "teams" || kind === "all" || !kind) refreshTeams();
       if (kind === "orgs" || kind === "all" || !kind) refreshAiOrg();
     };
